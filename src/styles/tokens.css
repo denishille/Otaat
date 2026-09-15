@@ -1,0 +1,83 @@
+/* ---------------------------------------------------------------
+   OTAAT — Paper & Cobalt
+   Eine Akzentfarbe, ein Signal, sonst Papier und Tinte.
+   Keine Farbe ohne Aufgabe.
+   --------------------------------------------------------------- */
+:root {
+  /* Flaechen */
+  --paper:        #F7F5F0;
+  --paper-sunk:   #EFECE4;
+  --surface:      #FFFFFF;
+  --surface-2:    #FBFAF7;
+
+  /* Tinte */
+  --ink:          #14161C;
+  --ink-2:        #474C58;
+  --ink-3:        #7C8493;
+  --ink-4:        #AEB4BF;
+
+  /* Kanten */
+  --line:         #E2DED4;
+  --line-strong:  #CFCABC;
+
+  /* Akzent */
+  --cobalt:       #2B4BF2;
+  --cobalt-deep:  #1E36BF;
+  --cobalt-wash:  #E8ECFE;
+
+  /* Signal */
+  --signal:       #FF5A1F;
+  --signal-wash:  #FFEDE4;
+
+  /* Zustaende */
+  --good:         #12885A;
+  --good-wash:    #E2F3EB;
+
+  /* Board-Palette — die einzige Stelle mit mehreren Farben */
+  --n-slate:      #8C93A3;
+  --n-cobalt:     #2B4BF2;
+  --n-signal:     #FF5A1F;
+  --n-moss:       #12885A;
+  --n-plum:       #7B3FA8;
+  --n-amber:      #C98A00;
+
+  /* Typo */
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --serif: 'Instrument Serif', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Raster */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(20, 22, 28, .05);
+  --shadow-2: 0 4px 16px -4px rgba(20, 22, 28, .10), 0 1px 2px rgba(20, 22, 28, .04);
+  --shadow-3: 0 18px 48px -16px rgba(20, 22, 28, .22);
+
+  --max: 1180px;
+}
+
+:root[data-theme='dark'] {
+  --paper:        #101218;
+  --paper-sunk:   #0A0C11;
+  --surface:      #181B23;
+  --surface-2:    #1E222B;
+  --ink:          #F2F1EC;
+  --ink-2:        #B6BCC9;
+  --ink-3:        #7C8493;
+  --ink-4:        #565D6B;
+  --line:         #2A2F3A;
+  --line-strong:  #3A404D;
+  --cobalt:       #6C85FF;
+  --cobalt-deep:  #8DA0FF;
+  --cobalt-wash:  #1B2143;
+  --signal:       #FF7A47;
+  --signal-wash:  #382014;
+  --good:         #3FBF87;
+  --good-wash:    #12291F;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-2: 0 4px 16px -4px rgba(0, 0, 0, .5);
+  --shadow-3: 0 18px 48px -16px rgba(0, 0, 0, .7);
+}

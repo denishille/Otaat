@@ -1,0 +1,338 @@
+import { useMemo, useState } from 'react'
+import { useStore, update, uid } from '../lib/store'
+import type { CheckDef, CheckKind, CheckValue } from '../lib/types'
+import { SCALE_LABELS } from '../data/checks'
+import { activeChecks, checkStreak, isFilled, meetsTarget, recentRatios, scoreDay, streak } from '../lib/scoring'
+import { addDays, longDate, today } from '../lib/dates'
+import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
+import { ChevL, ChevR, Plus, Trash } from '../components/Icons'
+import { Sheet } from '../components/Sheet'
+import { toast } from '../components/Toasts'
+
+export function Today() {
+  const { state } = useStore()
+  const [date, setDate] = useState(today())
+  const [editing, setEditing] = useState<CheckDef | null>(null)
+  const [adding, setAdding] = useState(false)
+
+  const defs = activeChecks(state)
+  const entry = state.days[date]
+  const score = scoreDay(state, date)
+  const run = streak(state)
+  const ratios = useMemo(() => recentRatios(state, 21, date), [state, date])
+  const goals = state.nodes.filter((n) => n.isGoal)
+
+  const isToday = date === today()
+
+  function setValue(def: CheckDef, value: CheckValue) {
+    const wasFilled = isFilled(entry?.values[def.id])
+    const nowFilled = isFilled(value)
+
+    update((d) => {
+      const day = (d.days[date] ??= { date, values: {}, awarded: [] })
+      if (value === null) delete day.values[def.id]
+      else day.values[def.id] = value
+
+      if (nowFilled && !(day.awarded ?? []).includes(def.id)) {
+        day.awarded = [...(day.awarded ?? []), def.id]
+        d.meta.xp += XP_PER_CHECK
+        if (def.goals?.length && meetsTarget(def, value)) d.meta.xp += XP_GOAL_PAYOFF * def.goals.length
+      }
+    })
+
+    if (nowFilled && !wasFilled) {
+      const after = scoreDay({ ...state, days: { ...state.days, [date]: { date, values: { ...(entry?.values ?? {}), [def.id]: value } } } }, date)
+      if (after.filled === after.total && after.total > 0) {
+        update((d) => { d.meta.xp += XP_DAY_COMPLETE })
+        toast('Tag vollständig', XP_DAY_COMPLETE + XP_PER_CHECK)
+      }
+    }
+  }
+
+  return (
+    <>
+      <div className="today-head">
+        <div>
+          <div className="eyebrow">Everything Checker</div>
+          <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
+        </div>
+        <div className="datepick">
+          <button className="arrowbtn" onClick={() => setDate(addDays(date, -1))} aria-label="Tag zurück"><ChevL /></button>
+          <div className="datepick-label">{isToday ? 'Heute' : longDate(date)}</div>
+          <button className="arrowbtn" disabled={isToday} onClick={() => setDate(addDays(date, 1))} aria-label="Tag vor"><ChevR /></button>
+          {!isToday && <button className="btn btn--quiet btn--sm" onClick={() => setDate(today())}>Zurück zu heute</button>}
+        </div>
+      </div>
+
+      <div className="daysum">
+        <div className="daysum-cell">
+          <div className="daysum-k">Erfasst</div>
+          <div className="daysum-v">{score.filled}<small> / {score.total}</small></div>
+        </div>
+        <div className="daysum-cell">
+          <div className="daysum-k">Ziel getroffen</div>
+          <div className="daysum-v">{score.met}</div>
+        </div>
+        <div className="daysum-cell">
+          <div className="daysum-k">Serie</div>
+          <div className="daysum-v">{run}<small> {run === 1 ? 'Tag' : 'Tage'}</small></div>
+        </div>
+        <div className="daysum-cell">
+          <div className="daysum-k">21 Tage</div>
+          <div className="trend">
+            {ratios.map((r, i) => (
+              <div key={i} className={'trend-bar' + (r >= 0.999 ? ' trend-bar--full' : '')} style={{ height: `${Math.max(8, r * 100)}%` }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="check-grid">
+        {defs.map((def) => (
+          <CheckCard
+            key={def.id}
+            def={def}
+            value={entry?.values[def.id] ?? null}
+            goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
+            streak={checkStreak(state, def, date)}
+            onChange={(v) => setValue(def, v)}
+            onEdit={() => setEditing(def)}
+          />
+        ))}
+
+        <button
+          className="check"
+          style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', borderStyle: 'dashed', background: 'transparent', boxShadow: 'none' }}
+          onClick={() => setAdding(true)}
+        >
+          <Plus /> <span style={{ fontSize: 14, fontWeight: 550 }}>Noch was tracken</span>
+        </button>
+      </div>
+
+      {(editing || adding) && (
+        <CheckEditor
+          def={editing}
+          goals={goals.map((g) => ({ id: g.id, text: g.text || 'Unbenanntes Ziel', color: g.color }))}
+          onClose={() => { setEditing(null); setAdding(false) }}
+        />
+      )}
+    </>
+  )
+}
+
+/* ---------------------------------------------------------------- */
+
+interface CardProps {
+  def: CheckDef
+  value: CheckValue
+  goalNames: { text: string; color: string }[]
+  streak: number
+  onChange: (v: CheckValue) => void
+  onEdit: () => void
+}
+
+function CheckCard({ def, value, goalNames, streak: s, onChange, onEdit }: CardProps) {
+  const filled = isFilled(value)
+  return (
+    <div className={'check' + (filled ? ' check--filled' : '')}>
+      <div className="check-top">
+        <button onClick={onEdit} className="check-name" style={{ textAlign: 'left' }} title="Bearbeiten">{def.name}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
+          {def.unit && <span className="check-unit">{def.unit}</span>}
+        </div>
+      </div>
+
+      <Input def={def} value={value} onChange={onChange} />
+
+      {goalNames.length > 0 && (
+        <div className="contrib">
+          zahlt ein auf
+          {goalNames.map((g, i) => (
+            <span className="contrib-tag" key={i}>
+              <i className="contrib-dot" style={{ background: `var(--n-${g.color})` }} />
+              {g.text.length > 22 ? g.text.slice(0, 21) + '…' : g.text}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Input({ def, value, onChange }: { def: CheckDef; value: CheckValue; onChange: (v: CheckValue) => void }) {
+  switch (def.kind) {
+    case 'bool':
+      return (
+        <div className="bool">
+          <button className="yes" aria-pressed={value === true} onClick={() => onChange(value === true ? null : true)}>Ja</button>
+          <button aria-pressed={value === false} onClick={() => onChange(value === false ? null : false)}>Nein</button>
+        </div>
+      )
+    case 'scale':
+      return (
+        <div className="scale">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button key={n} aria-pressed={value === n} title={SCALE_LABELS[n - 1]} onClick={() => onChange(value === n ? null : n)}>{n}</button>
+          ))}
+        </div>
+      )
+    case 'number': {
+      const step = def.step ?? 1
+      const num = typeof value === 'number' ? value : null
+      const bump = (dir: number) => onChange(Math.max(0, Math.round(((num ?? 0) + dir * step) * 100) / 100))
+      return (
+        <div className="stepper">
+          <button onClick={() => bump(-1)} aria-label="weniger">−</button>
+          <input
+            type="number" inputMode="decimal" step={step} min={0}
+            value={num ?? ''} placeholder="–"
+            onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          />
+          <button onClick={() => bump(1)} aria-label="mehr">+</button>
+        </div>
+      )
+    }
+    case 'choice':
+      return (
+        <div className="choice">
+          {(def.options ?? []).map((o) => (
+            <button key={o} aria-pressed={value === o} onClick={() => onChange(value === o ? null : o)}>{o}</button>
+          ))}
+        </div>
+      )
+    case 'text':
+      return (
+        <textarea
+          className="textarea" placeholder="…"
+          value={typeof value === 'string' ? value : ''}
+          onChange={(e) => onChange(e.target.value || null)}
+        />
+      )
+  }
+}
+
+/* ---------------------------------------------------------------- */
+
+const KINDS: { k: CheckKind; label: string }[] = [
+  { k: 'bool', label: 'Ja / Nein' },
+  { k: 'scale', label: 'Skala 1–5' },
+  { k: 'number', label: 'Zahl' },
+  { k: 'choice', label: 'Auswahl' },
+  { k: 'text', label: 'Freitext' },
+]
+
+function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { id: string; text: string; color: string }[]; onClose: () => void }) {
+  const [name, setName] = useState(def?.name ?? '')
+  const [kind, setKind] = useState<CheckKind>(def?.kind ?? 'bool')
+  const [unit, setUnit] = useState(def?.unit ?? '')
+  const [options, setOptions] = useState((def?.options ?? []).join(', '))
+  const [target, setTarget] = useState(def?.target !== undefined ? String(def.target) : '')
+  const [inverse, setInverse] = useState(!!def?.inverse)
+  const [linked, setLinked] = useState<string[]>(def?.goals ?? [])
+
+  const save = () => {
+    if (!name.trim()) return
+    const patch: Omit<CheckDef, 'id' | 'sort'> = {
+      name: name.trim(),
+      kind,
+      unit: unit.trim() || undefined,
+      options: kind === 'choice' ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
+      target: target === '' ? undefined : Number(target),
+      inverse: inverse || undefined,
+      goals: linked.length ? linked : undefined,
+    }
+    update((d) => {
+      if (def) {
+        const i = d.checks.findIndex((c) => c.id === def.id)
+        if (i >= 0) d.checks[i] = { ...d.checks[i], ...patch }
+      } else {
+        const sort = Math.max(0, ...d.checks.map((c) => c.sort)) + 10
+        d.checks.push({ id: uid(), sort, ...patch })
+      }
+    })
+    onClose()
+  }
+
+  const remove = () => {
+    if (!def) return
+    update((d) => { d.checks = d.checks.filter((c) => c.id !== def.id) })
+    toast(`„${def.name}" entfernt`)
+    onClose()
+  }
+
+  return (
+    <Sheet
+      title={def ? def.name : 'Neuer Check'}
+      onClose={onClose}
+      footer={
+        <>
+          {def && <button className="btn btn--quiet btn--danger" onClick={remove} style={{ marginRight: 'auto' }}><Trash /> Löschen</button>}
+          <button className="btn btn--ghost" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn--primary" onClick={save} disabled={!name.trim()}>Speichern</button>
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor="ce-name">Name</label>
+        <input id="ce-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="z.B. Kaltduschen" autoFocus />
+      </div>
+
+      <div className="field">
+        <label>Eingabe</label>
+        <div className="choice">
+          {KINDS.map(({ k, label }) => (
+            <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {kind === 'choice' && (
+        <div className="field">
+          <label htmlFor="ce-opt">Optionen, mit Komma getrennt</label>
+          <input id="ce-opt" className="input" value={options} onChange={(e) => setOptions(e.target.value)} placeholder="Kraft, Cardio, Nix" />
+        </div>
+      )}
+
+      {kind === 'number' && (
+        <div className="field">
+          <label htmlFor="ce-unit">Einheit</label>
+          <input id="ce-unit" className="input" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="h, Tassen, km" />
+        </div>
+      )}
+
+      {(kind === 'number' || kind === 'scale') && (
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="ce-target">{inverse ? 'Höchstens' : 'Mindestens'}</label>
+            <input id="ce-target" className="input mono" type="number" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="–" />
+          </div>
+          <button className="btn btn--ghost" onClick={() => setInverse(!inverse)} style={{ marginBottom: 1 }}>
+            {inverse ? 'Weniger ist besser' : 'Mehr ist besser'}
+          </button>
+        </div>
+      )}
+
+      <div className="field">
+        <label>Zahlt ein auf</label>
+        {goals.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+            Noch keine Ziele. Markiere auf <b>Mind my Business</b> einen Eintrag als Ziel, dann taucht er hier auf.
+          </div>
+        ) : (
+          <div className="choice">
+            {goals.map((g) => (
+              <button
+                key={g.id}
+                aria-pressed={linked.includes(g.id)}
+                onClick={() => setLinked((cur) => (cur.includes(g.id) ? cur.filter((x) => x !== g.id) : [...cur, g.id]))}
+              >
+                {g.text.length > 30 ? g.text.slice(0, 29) + '…' : g.text}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  )
+}
