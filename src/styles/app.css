@@ -28,7 +28,7 @@ a { color: var(--cobalt); text-decoration: none; }
 .shell { display: flex; flex-direction: column; min-height: 100%; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 40;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
   display: flex; align-items: center; gap: 24px;
   padding: 0 24px; height: 64px;
   background: color-mix(in srgb, var(--paper) 86%, transparent);
@@ -371,7 +371,14 @@ h2.section-title {
 
 /* ============================ Board ============================ */
 
-.board-wrap { position: relative; height: calc(100vh - 64px); overflow: hidden; background: var(--paper-sunk); }
+/* dvh statt vh wegen der einklappenden Browserleiste auf dem iPhone; die
+   Safe-Area-Insets kommen raus, weil das Board bis an die Kante laeuft. */
+.board-wrap {
+  position: relative;
+  height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+  background: var(--paper-sunk);
+}
 
 .board-canvas {
   position: absolute; inset: 0;
@@ -569,7 +576,7 @@ h2.section-title {
   .check-grid { grid-template-columns: 1fr; }
   .fm-item { grid-template-columns: auto 1fr; row-gap: 10px; }
   .fm-right { grid-column: 2; }
-  .board-wrap { height: calc(100vh - 58px); }
+  .board-wrap { height: calc(100dvh - 58px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .sheet { max-height: 88vh; }
   .scrim { padding: 12px; align-items: flex-end; }
 }

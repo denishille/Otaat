@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useStore, update, applyTheme, signIn, signOut, pushAll } from './lib/store'
+import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
 import { levelFor, titleFor } from './lib/xp'
 import { Today } from './views/Today'
@@ -42,8 +42,9 @@ export default function App() {
   const { level, into, span } = levelFor(state.meta.xp)
   const due = state.reminders.filter((r) => !r.done && daysBetween(today(), r.due) <= r.lead).length
 
+  const shown = resolvedTheme(state.meta.theme)
   const toggleTheme = () => {
-    const next = state.meta.theme === 'dark' ? 'light' : 'dark'
+    const next = shown === 'dark' ? 'light' : 'dark'
     update((d) => { d.meta.theme = next })
     applyTheme(next)
   }
@@ -75,7 +76,7 @@ export default function App() {
             <div className="xp-track"><div className="xp-fill" style={{ width: `${(into / span) * 100}%` }} /></div>
           </div>
           <button className="iconbtn" onClick={toggleTheme} aria-label="Hell / dunkel">
-            {state.meta.theme === 'dark' ? <Sun /> : <Moon />}
+            {shown === 'dark' ? <Sun /> : <Moon />}
           </button>
           <button className="btn btn--ghost btn--sm" onClick={() => setAccount(true)}>
             {!cloudEnabled ? 'Lokal' : userId ? (status === 'error' ? 'Sync-Fehler' : status === 'syncing' ? 'Sync…' : 'Synced') : 'Anmelden'}

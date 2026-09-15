@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { AppState, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder } from './types'
+import type { AppState, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
 import { DEFAULT_CHECKS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
 
@@ -12,7 +12,7 @@ export const emptyState = (): AppState => ({
   nodes: [],
   frames: [],
   edges: [],
-  meta: { xp: 0, theme: 'light', dismissedPresets: [] },
+  meta: { xp: 0, theme: 'system', dismissedPresets: [] },
 })
 
 export type SyncStatus = 'local' | 'signed-out' | 'syncing' | 'synced' | 'error'
@@ -106,8 +106,16 @@ export function loadLocal() {
   }
 }
 
-export function applyTheme(theme: 'light' | 'dark') {
-  document.documentElement.dataset.theme = theme
+export function applyTheme(theme: Theme) {
+  // Kein Stempel bei 'system' — dann entscheidet prefers-color-scheme.
+  if (theme === 'system') delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = theme
+}
+
+/** Was gerade tatsaechlich auf dem Schirm ist, auch wenn 'system' gewaehlt ist. */
+export function resolvedTheme(theme: Theme): 'light' | 'dark' {
+  if (theme !== 'system') return theme
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 /* ------------------------------------------------------------------ */

@@ -92,6 +92,9 @@ export interface BoardEdge {
 
 /* ---------- Gesamtzustand ---------- */
 
+/** 'system' folgt der Einstellung des Betriebssystems. */
+export type Theme = 'light' | 'dark' | 'system'
+
 export interface AppState {
   checks: CheckDef[]
   days: Record<string, DayEntry>
@@ -99,5 +102,5 @@ export interface AppState {
   nodes: BoardNode[]
   frames: BoardFrame[]
   edges: BoardEdge[]
-  meta: { xp: number; theme: 'light' | 'dark'; dismissedPresets: string[] }
+  meta: { xp: number; theme: Theme; dismissedPresets: string[] }
 }
