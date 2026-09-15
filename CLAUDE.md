@@ -15,7 +15,9 @@ npm run build      # tsc -b && vite build -> dist/
 npm run typecheck  # nur Typen prüfen
 
 node tools/bundle-single-file.mjs otaat-standalone.html   # eine Datei zum Verschicken
-node tools/bundle-single-file.mjs --artifact out.html     # ohne äußeres Geerüst
+node tools/bundle-single-file.mjs --artifact out.html     # ohne äußeres Gerüst
+
+npx wrangler deploy --dry-run   # Deploy-Config prüfen, ohne auszurollen
 ```
 
 Vor jedem Commit läuft `npm run build` — der Build enthält `tsc -b` und
@@ -30,6 +32,7 @@ schlägt bei Typfehlern fehl.
 | `src/data/catalog.ts` | Das Regal — Vorlagen für Future Me Problems |
 | `src/styles/tokens.css` | Alle Farben. Dark Mode ist eine Umdefinition derselben Variablen. |
 | `supabase/migrations/` | Schema, Indizes, RLS |
+| `wrangler.jsonc` | Cloudflare-Deploy. `build.command` baut, `assets.directory` ist `dist/`. Der `name` muss dem Worker in Cloudflare entsprechen. |
 
 ## Design
 

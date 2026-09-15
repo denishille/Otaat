@@ -69,30 +69,43 @@ Browsers. Gut zum Ausprobieren, schlecht als Langzeitspeicher.
 Beim ersten Login auf einem leeren Account wird der lokale Stand **hochgeschoben**
 statt überschrieben — was du offline angelegt hast, geht nicht verloren.
 
-## Deployment auf Cloudflare Pages
+## Deployment auf Cloudflare
+
+Das Projekt laeuft als **Worker mit statischen Assets** (Workers Builds), nicht
+als klassisches Pages-Projekt. Alles Noetige steht in `wrangler.jsonc`:
+`build.command` baut, `assets.directory` zeigt auf `dist/`. Im Dashboard muss
+dafuer kein Build-Command hinterlegt sein — wrangler fuehrt ihn selbst aus.
+
+Zwei Dinge, die das Repo nicht regeln kann:
+
+**Der Name muss passen.** `name` in `wrangler.jsonc` muss dem Worker in
+Cloudflare entsprechen. Stimmt er nicht, legt wrangler kommentarlos einen
+zweiten Worker an — der Build ist gruen, die Domain zeigt trotzdem den alten
+Stand.
+
+**Das Deploy-Command entscheidet, ob es live geht.** `npx wrangler deploy`
+schaltet die neue Version scharf. `npx wrangler versions upload` laedt sie nur
+hoch, ohne sie auszurollen — gedacht fuer Vorschau-Branches. Steht das fuer den
+Production Branch auf `versions upload`, aendert sich an der Domain nie etwas,
+egal wie oft gebaut wird.
 
 | Einstellung | Wert |
 |---|---|
-| Production branch | `main` |
-| Build command | `npm run build` |
-| Output directory | `dist` |
+| Branch | `main` |
+| Deploy command (Production) | `npx wrangler deploy` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
-Die Node-Version steht in `.nvmrc`; Cloudflare liest die Datei. Ohne sie baut
-Pages je nach Projektalter mit einer zu alten Node-Version, an der Vite 5
-scheitert.
+Die Node-Version steht in `.nvmrc`. Die Env-Variablen muessen zur **Build**-Zeit
+gesetzt sein, nicht zur Laufzeit: Vite backt sie in das Bundle. Nachtraeglich
+gesetzte Variablen wirken erst nach einem neuen Build.
 
-Nur Pushes auf den **Production Branch** landen auf der eigenen Domain. Jeder
-andere Branch wird als Preview unter einer eigenen `*.pages.dev`-Adresse
-deployed — die Domain bleibt dann auf dem alten Stand, obwohl der Build grün ist.
+Die Navigation laeuft ueber Hash-Routing (`#/today`), es braucht also keine
+Rewrite-Regeln. `public/_redirects` und `public/_headers` liegen trotzdem dabei
+— Workers Assets liest beide — falls spaeter auf History-Routing umgestellt wird.
 
-Die Navigation läuft über Hash-Routing (`#/today`), es braucht also keine
-Rewrite-Regeln. `public/_redirects` liegt trotzdem dabei, falls später auf
-History-Routing umgestellt wird.
-
-> Der `anon`-Key gehört ins Frontend, das ist so vorgesehen. Was ihn absichert,
+> Der `anon`-Key gehoert ins Frontend, das ist so vorgesehen. Was ihn absichert,
 > ist RLS — nicht Geheimhaltung. Der **Service-Role-Key** dagegen darf niemals
-> in den Build; er wird ausschließlich in der Edge Function verwendet, wo
+> in den Build; er wird ausschliesslich in der Edge Function verwendet, wo
 > Supabase ihn automatisch injiziert.
 
 ## Kalender (Apple)

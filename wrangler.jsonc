@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  // Muss dem Namen des Workers in Cloudflare entsprechen. Stimmt er nicht
+  // ueberein, legt wrangler still einen zweiten Worker an — der Build ist
+  // dann gruen, aber die Domain zeigt weiter den alten Stand.
+  "name": "otaat",
+  "compatibility_date": "2026-09-15",
+
+  // Laeuft vor dem Upload. Ohne diese Zeile deployt Cloudflare ein leeres
+  // dist/, weil im Dashboard kein Build-Command hinterlegt ist.
+  "build": {
+    "command": "npm run build"
+  },
+
+  "assets": {
+    "directory": "./dist",
+    // Hash-Routing braucht das nicht, aber es kostet nichts und faengt
+    // direkt aufgerufene Pfade ab, falls spaeter auf History-Routing
+    // umgestellt wird.
+    "not_found_handling": "single-page-application"
+  }
+}
