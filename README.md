@@ -91,7 +91,7 @@ egal wie oft gebaut wird.
 
 | Einstellung | Wert |
 |---|---|
-| Branch | `claude/habit-structure-app-1szmgx` |
+| Branch | `main` |
 | Deploy command | `npx wrangler deploy` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 

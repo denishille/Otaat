@@ -2,16 +2,12 @@
 
 ## Branches
 
-**Arbeitsbranch ist `claude/habit-structure-app-1szmgx`.** Dort wird
-entwickelt, committet und gepusht — das ist der Branch, den Cloudflare baut
-und der hinter der Domain steht.
+**Direkt auf `main` arbeiten und dorthin pushen.** Das ist der Branch, den
+Cloudflare baut und der hinter der Domain steht. Keine Feature-Branches, keine
+Pull Requests, solange nicht ausdrücklich danach gefragt wird.
 
-`main` wird nicht mehr gepflegt. Nicht dorthin pushen, nicht dorthin mergen,
-auch wenn GitHub ihn als Default-Branch anzeigt und eine Session dort startet:
-dann auf `claude/habit-structure-app-1szmgx` wechseln.
-
-Keine Feature-Branches, keine Pull Requests, solange nicht ausdrücklich danach
-gefragt wird.
+Startet eine Session auf einem anderen Branch, zuerst auf `main` wechseln und
+die Arbeit dort machen.
 
 ## Befehle
 
