@@ -185,7 +185,7 @@ function Stat({ k, v }: { k: string; v: string }) {
   return (
     <div>
       <div className="daysum-k">{k}</div>
-      <div style={{ fontFamily: 'var(--serif)', fontSize: 28, lineHeight: 1.1 }}>{v}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 28, lineHeight: 1.1 }}>{v}</div>
     </div>
   )
 }

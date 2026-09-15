@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
-import type { CheckDef, CheckKind, CheckValue } from '../lib/types'
+import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
-import { activeChecks, checkStreak, isFilled, meetsTarget, recentRatios, scoreDay, streak } from '../lib/scoring'
+import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scoreDay, streak } from '../lib/scoring'
+import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
 import { ChevL, ChevR, Plus, Trash } from '../components/Icons'
@@ -19,8 +20,9 @@ export function Today() {
   const entry = state.days[date]
   const score = scoreDay(state, date)
   const run = streak(state)
-  const ratios = useMemo(() => recentRatios(state, 21, date), [state, date])
   const goals = state.nodes.filter((n) => n.isGoal)
+  const carried = useMemo(() => carriedDefaults(state, date), [state, date])
+  const openCarried = defs.filter((d) => !isFilled(entry?.values[d.id]) && isFilled(carried[d.id]))
 
   const isToday = date === today()
 
@@ -49,6 +51,20 @@ export function Today() {
     }
   }
 
+  /** Neue Sportart o.ae. direkt in der Karte anlegen. */
+  function addOption(def: CheckDef, option: string) {
+    const clean = option.trim()
+    if (!clean) return
+    update((d) => {
+      const c = d.checks.find((x) => x.id === def.id)
+      if (c && !c.options?.includes(clean)) c.options = [...(c.options ?? []), clean]
+    })
+  }
+
+  function takeAllCarried() {
+    for (const def of openCarried) setValue(def, carried[def.id])
+  }
+
   return (
     <>
       <div className="today-head">
@@ -70,22 +86,21 @@ export function Today() {
           <div className="daysum-v">{score.filled}<small> / {score.total}</small></div>
         </div>
         <div className="daysum-cell">
-          <div className="daysum-k">Ziel getroffen</div>
-          <div className="daysum-v">{score.met}</div>
-        </div>
-        <div className="daysum-cell">
           <div className="daysum-k">Serie</div>
           <div className="daysum-v">{run}<small> {run === 1 ? 'Tag' : 'Tage'}</small></div>
         </div>
-        <div className="daysum-cell">
-          <div className="daysum-k">21 Tage</div>
-          <div className="trend">
-            {ratios.map((r, i) => (
-              <div key={i} className={'trend-bar' + (r >= 0.999 ? ' trend-bar--full' : '')} style={{ height: `${Math.max(8, r * 100)}%` }} />
-            ))}
-          </div>
-        </div>
       </div>
+
+      <Insights state={state} />
+
+      {openCarried.length > 0 && (
+        <div className="insights-progress" style={{ marginBottom: 20 }}>
+          <span style={{ flex: 1 }}>
+            {openCarried.length} {openCarried.length === 1 ? 'Feld steht' : 'Felder stehen'} auf dem Wert vom letzten Mal.
+          </span>
+          <button className="btn btn--primary btn--sm" onClick={() => takeAllCarried()}>Alle übernehmen</button>
+        </div>
+      )}
 
       <div className="check-grid">
         {defs.map((def) => (
@@ -93,10 +108,12 @@ export function Today() {
             key={def.id}
             def={def}
             value={entry?.values[def.id] ?? null}
+            suggestion={carried[def.id] ?? null}
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
             streak={checkStreak(state, def, date)}
             onChange={(v) => setValue(def, v)}
             onEdit={() => setEditing(def)}
+            onAddOption={(o) => addOption(def, o)}
           />
         ))}
 
@@ -125,25 +142,32 @@ export function Today() {
 interface CardProps {
   def: CheckDef
   value: CheckValue
+  /** Wert vom letzten Mal — wird gezeigt, solange nichts eingetragen ist */
+  suggestion: CheckValue
   goalNames: { text: string; color: string }[]
   streak: number
   onChange: (v: CheckValue) => void
   onEdit: () => void
+  onAddOption: (option: string) => void
 }
 
-function CheckCard({ def, value, goalNames, streak: s, onChange, onEdit }: CardProps) {
+function CheckCard({ def, value, suggestion, goalNames, streak: s, onChange, onEdit, onAddOption }: CardProps) {
   const filled = isFilled(value)
+  const carried = !filled && isFilled(suggestion)
+  const shown = filled ? value : carried ? suggestion : null
+
   return (
-    <div className={'check' + (filled ? ' check--filled' : '')}>
+    <div className={'check' + (filled ? ' check--filled' : '') + (carried ? ' check--carried' : '')}>
       <div className="check-top">
         <button onClick={onEdit} className="check-name" style={{ textAlign: 'left' }} title="Bearbeiten">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
+          {carried && <span className="carried-hint">wie zuletzt</span>}
+          {!carried && s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
           {def.unit && <span className="check-unit">{def.unit}</span>}
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} />
+      <Input def={def} value={shown} onChange={onChange} onAddOption={onAddOption} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -160,7 +184,12 @@ function CheckCard({ def, value, goalNames, streak: s, onChange, onEdit }: CardP
   )
 }
 
-function Input({ def, value, onChange }: { def: CheckDef; value: CheckValue; onChange: (v: CheckValue) => void }) {
+function Input({ def, value, onChange, onAddOption }: {
+  def: CheckDef
+  value: CheckValue
+  onChange: (v: CheckValue) => void
+  onAddOption: (option: string) => void
+}) {
   switch (def.kind) {
     case 'bool':
       return (
@@ -201,6 +230,8 @@ function Input({ def, value, onChange }: { def: CheckDef; value: CheckValue; onC
           ))}
         </div>
       )
+    case 'multi':
+      return <MultiInput def={def} value={value} onChange={onChange} onAddOption={onAddOption} />
     case 'text':
       return (
         <textarea
@@ -212,6 +243,140 @@ function Input({ def, value, onChange }: { def: CheckDef; value: CheckValue; onC
   }
 }
 
+function MultiInput({ def, value, onChange, onAddOption }: {
+  def: CheckDef
+  value: CheckValue
+  onChange: (v: CheckValue) => void
+  onAddOption: (option: string) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  const picked = Array.isArray(value) ? value : []
+
+  const toggle = (o: string) => {
+    // "Nix" und tatsaechlich gemachter Sport schliessen sich gegenseitig aus
+    if (o === def.noneOption) {
+      onChange(picked.includes(o) ? null : [o])
+      return
+    }
+    const next = picked.includes(o)
+      ? picked.filter((x) => x !== o)
+      : [...picked.filter((x) => x !== def.noneOption), o]
+    onChange(next.length ? next : null)
+  }
+
+  const commit = () => {
+    const clean = draft.trim()
+    setAdding(false)
+    setDraft('')
+    if (!clean) return
+    onAddOption(clean)
+    if (!picked.includes(clean)) onChange([...picked.filter((x) => x !== def.noneOption), clean])
+  }
+
+  return (
+    <div className="multi">
+      {(def.options ?? []).map((o) => (
+        <button
+          key={o}
+          className={o === def.noneOption ? 'none' : undefined}
+          aria-pressed={picked.includes(o)}
+          onClick={() => toggle(o)}
+        >
+          {o}
+        </button>
+      ))}
+      {adding ? (
+        <input
+          autoFocus value={draft}
+          placeholder="Sportart"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') { setAdding(false); setDraft('') }
+          }}
+        />
+      ) : (
+        <button className="addopt" onClick={() => setAdding(true)} aria-label="Eigene Option hinzufügen">
+          <Plus />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------- */
+
+/**
+ * Zusammenhaenge zwischen den Checks. Laeuft von allein, sobald genug Tage
+ * beisammen sind — vorher steht hier, wie weit es noch ist.
+ */
+function Insights({ state }: { state: AppState }) {
+  const days = useMemo(() => loggedDays(state), [state])
+  const found = useMemo(() => (days >= MIN_DAYS ? findInsights(state) : []), [state, days])
+
+  if (days < MIN_DAYS) {
+    return (
+      <div className="insights">
+        <div className="insights-progress">
+          <span style={{ flex: 1 }}>
+            Ab <b>{MIN_DAYS} erfassten Tagen</b> sucht OTAAT selbstständig nach Zusammenhängen
+            zwischen deinen Checks. Noch {MIN_DAYS - days} {MIN_DAYS - days === 1 ? 'Tag' : 'Tage'}.
+          </span>
+          <div className="xp-track">
+            <div className="xp-fill" style={{ width: `${(days / MIN_DAYS) * 100}%` }} />
+          </div>
+          <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{days}/{MIN_DAYS}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (found.length === 0) {
+    return (
+      <div className="insights">
+        <div className="insights-progress">
+          <span>
+            {days} Tage ausgewertet, nichts Auffälliges dabei. Kein schlechtes Zeichen — es heißt
+            nur, dass sich deine Werte bisher unabhängig voneinander bewegen.
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const top = found.slice(0, 5)
+
+  return (
+    <section className="insights">
+      <div className="insights-head">
+        <h2 className="section-title">Was zusammenhängt</h2>
+        <span className="insights-note">
+          aus {days} Tagen · zeigt Zusammenhänge, keine Ursachen
+        </span>
+      </div>
+
+      {top.map((i) => (
+        <div className="insight" key={`${i.a.id}-${i.b.id}-${i.lagged}`}>
+          <div className="insight-text">
+            War <b>{i.a.name}</b> hoch, war <b>{i.b.name}</b>{' '}
+            {i.lagged ? 'am nächsten Tag' : 'am selben Tag'} meist{' '}
+            <b>{i.r > 0 ? 'hoch' : 'niedrig'}</b>.
+          </div>
+          <div className="insight-meta">
+            <span>{strengthLabel(i.r)}</span>
+            <div className={'insight-bar ' + (i.r > 0 ? 'insight-bar--up' : 'insight-bar--down')}>
+              <i style={{ width: `${Math.min(100, Math.abs(i.r) * 100)}%` }} />
+            </div>
+            <span>{i.n} T</span>
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 /* ---------------------------------------------------------------- */
 
 const KINDS: { k: CheckKind; label: string }[] = [
@@ -219,6 +384,7 @@ const KINDS: { k: CheckKind; label: string }[] = [
   { k: 'scale', label: 'Skala 1–5' },
   { k: 'number', label: 'Zahl' },
   { k: 'choice', label: 'Auswahl' },
+  { k: 'multi', label: 'Mehrfachauswahl' },
   { k: 'text', label: 'Freitext' },
 ]
 
@@ -237,7 +403,7 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
       name: name.trim(),
       kind,
       unit: unit.trim() || undefined,
-      options: kind === 'choice' ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
+      options: kind === 'choice' || kind === 'multi' ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
       target: target === '' ? undefined : Number(target),
       inverse: inverse || undefined,
       goals: linked.length ? linked : undefined,
@@ -287,7 +453,7 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
         </div>
       </div>
 
-      {kind === 'choice' && (
+      {(kind === 'choice' || kind === 'multi') && (
         <div className="field">
           <label htmlFor="ce-opt">Optionen, mit Komma getrennt</label>
           <input id="ce-opt" className="input" value={options} onChange={(e) => setOptions(e.target.value)} placeholder="Kraft, Cardio, Nix" />

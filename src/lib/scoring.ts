@@ -1,8 +1,11 @@
 import type { AppState, CheckDef, CheckValue, DayEntry } from './types'
 import { addDays, today } from './dates'
 
-export const isFilled = (v: CheckValue | undefined): boolean =>
-  v !== undefined && v !== null && v !== ''
+export const isFilled = (v: CheckValue | undefined): boolean => {
+  if (v === undefined || v === null || v === '') return false
+  if (Array.isArray(v)) return v.length > 0
+  return true
+}
 
 /** Wurde der eigene Anspruch an diesem Tag getroffen? */
 export function meetsTarget(def: CheckDef, v: CheckValue | undefined): boolean {
@@ -16,10 +19,38 @@ export function meetsTarget(def: CheckDef, v: CheckValue | undefined): boolean {
       if (def.target === undefined) return true
       return def.inverse ? v <= def.target : v >= def.target
     }
+    case 'multi': {
+      // Nur "Nix" angehakt heisst: nichts gemacht.
+      if (!Array.isArray(v)) return false
+      return v.some((o) => o !== def.noneOption)
+    }
     case 'choice':
     case 'text':
       return true
   }
+}
+
+/** Wie weit zurueck nach einem Wert gesucht wird, den man uebernehmen kann. */
+const CARRY_WINDOW = 30
+
+/**
+ * Vorschlaege fuer einen Tag: was zuletzt eingetragen wurde, gilt als Default.
+ * Gesucht wird der juengste Tag davor, der fuer den Check einen Wert hat —
+ * eine Luecke von ein paar Tagen bricht die Uebernahme also nicht.
+ * Ohne Vortag greift `fallback` aus der Check-Definition.
+ */
+export function carriedDefaults(s: AppState, date: string): Record<string, CheckValue> {
+  const out: Record<string, CheckValue> = {}
+  for (const def of activeChecks(s)) {
+    let found: CheckValue | undefined
+    for (let i = 1; i <= CARRY_WINDOW; i++) {
+      const v = s.days[addDays(date, -i)]?.values[def.id]
+      if (isFilled(v)) { found = v; break }
+    }
+    const value = found ?? def.fallback
+    if (isFilled(value)) out[def.id] = value as CheckValue
+  }
+  return out
 }
 
 export const activeChecks = (s: AppState): CheckDef[] =>

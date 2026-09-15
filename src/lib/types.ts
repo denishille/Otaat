@@ -4,7 +4,7 @@ export type ID = string
 
 /* ---------- Everything Checker ---------- */
 
-export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'text'
+export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'multi' | 'text'
 
 export interface CheckDef {
   id: ID
@@ -12,8 +12,12 @@ export interface CheckDef {
   kind: CheckKind
   /** kurzer Einheiten-Hinweis, z.B. "h", "Tassen" — bewusst nur wo noetig */
   unit?: string
-  /** fuer kind === 'choice' */
+  /** fuer kind === 'choice' und 'multi' */
   options?: string[]
+  /** Option, die alle anderen ausschliesst — z.B. "Nix" bei Sport */
+  noneOption?: string
+  /** Startwert fuer einen frischen Tag, wenn es noch keinen Vortag gibt */
+  fallback?: CheckValue
   /** Schrittweite fuer kind === 'number' */
   step?: number
   /** Ab diesem Wert zaehlt der Tag als "erfuellt" (number/scale). Bei bool: true. */
@@ -26,7 +30,7 @@ export interface CheckDef {
   sort: number
 }
 
-export type CheckValue = boolean | number | string | null
+export type CheckValue = boolean | number | string | string[] | null
 
 export interface DayEntry {
   date: string            // YYYY-MM-DD
@@ -102,5 +106,5 @@ export interface AppState {
   nodes: BoardNode[]
   frames: BoardFrame[]
   edges: BoardEdge[]
-  meta: { xp: number; theme: Theme; dismissedPresets: string[] }
+  meta: { xp: number; theme: Theme; dismissedPresets: string[]; v?: number }
 }

@@ -43,7 +43,7 @@
 
   /* Typo */
   --sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --serif: 'Instrument Serif', Georgia, serif;
+  --display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Raster */

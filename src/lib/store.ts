@@ -1,9 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import type { AppState, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
-import { DEFAULT_CHECKS } from '../data/checks'
+import { DEFAULT_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
 
 const LS_KEY = 'otaat.state.v1'
+
+/** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
+const STATE_VERSION = 2
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
@@ -12,7 +15,7 @@ export const emptyState = (): AppState => ({
   nodes: [],
   frames: [],
   edges: [],
-  meta: { xp: 0, theme: 'system', dismissedPresets: [] },
+  meta: { xp: 0, theme: 'system', dismissedPresets: [], v: STATE_VERSION },
 })
 
 export type SyncStatus = 'local' | 'signed-out' | 'syncing' | 'synced' | 'error'
@@ -98,12 +101,60 @@ export function loadLocal() {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return
     const parsed = JSON.parse(raw) as Partial<AppState>
-    state = { ...emptyState(), ...parsed, meta: { ...emptyState().meta, ...parsed.meta } }
+    const base = emptyState()
+    const merged = { ...base, ...parsed, meta: { ...base.meta, ...parsed.meta } }
+    // Ein Stand ohne Checks waere eine leere App ohne Weg zurueck.
+    if (!merged.checks?.length) merged.checks = base.checks
+    state = migrate(merged)
     applyTheme(state.meta.theme)
+    saveLocal()
     emit()
   } catch {
     /* kaputter Eintrag — wir starten sauber statt zu crashen */
   }
+}
+
+/**
+ * Bringt einen gespeicherten Stand auf die aktuelle Check-Aufstellung.
+ * Erfasste Tage bleiben dabei erhalten: abgeschaffte Checks wandern ins
+ * Archiv statt geloescht zu werden, und Werte, deren Form sich geaendert hat,
+ * werden umgeschrieben statt verworfen.
+ */
+export function migrate(s: AppState): AppState {
+  if ((s.meta.v ?? 1) >= STATE_VERSION) return s
+
+  const byId = new Map(s.checks.map((c) => [c.id, c]))
+
+  // Sport war eine Einfachauswahl und ist jetzt eine Mehrfachauswahl;
+  // Mobility war ein eigener Check und ist jetzt eine Option darin.
+  for (const day of Object.values(s.days)) {
+    const sport = day.values['sport']
+    const picked: string[] = Array.isArray(sport) ? [...sport] : typeof sport === 'string' ? [sport] : []
+    if (day.values['mobility'] === true && !picked.includes('Mobility')) picked.push('Mobility')
+    if (picked.length) day.values['sport'] = picked
+    delete day.values['mobility']
+    delete day.values['food']
+  }
+
+  // Aktuelle Definitionen uebernehmen, die Verknuepfungen zu Board-Zielen behalten
+  const next = DEFAULT_CHECKS.map((def) => {
+    const old = byId.get(def.id)
+    return old?.goals?.length ? { ...def, goals: old.goals } : { ...def }
+  })
+
+  // Abgeschaffte Checks: mit Daten ins Archiv, ohne Daten raus
+  for (const id of RETIRED_CHECK_IDS) {
+    const old = byId.get(id)
+    if (!old) continue
+    const used = Object.values(s.days).some((d) => d.values[id] !== undefined)
+    if (used) next.push({ ...old, archived: true })
+  }
+
+  // Selbst angelegte Checks bleiben unangetastet
+  const known = new Set([...DEFAULT_CHECKS.map((d) => d.id), ...RETIRED_CHECK_IDS])
+  for (const c of s.checks) if (!known.has(c.id)) next.push(c)
+
+  return { ...s, checks: next, meta: { ...s.meta, v: STATE_VERSION } }
 }
 
 export function applyTheme(theme: Theme) {

@@ -244,7 +244,7 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
       {groups.map((g) => (
         <section key={g.category}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
-            <h4 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 19 }}>{g.category}</h4>
+            <h4 style={{ margin: 0, fontFamily: 'var(--display)', fontWeight: 400, fontSize: 19 }}>{g.category}</h4>
             <button className="btn btn--quiet btn--sm" onClick={() => addAll(g.items)}>alle</button>
           </div>
           <div className="cat-grid">
