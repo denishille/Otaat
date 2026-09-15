@@ -91,8 +91,8 @@ egal wie oft gebaut wird.
 
 | Einstellung | Wert |
 |---|---|
-| Branch | `main` |
-| Deploy command (Production) | `npx wrangler deploy` |
+| Branch | `claude/habit-structure-app-1szmgx` |
+| Deploy command | `npx wrangler deploy` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 Die Node-Version steht in `.nvmrc`. Die Env-Variablen muessen zur **Build**-Zeit
