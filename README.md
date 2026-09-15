@@ -99,9 +99,17 @@ Die Node-Version steht in `.nvmrc`. Die Env-Variablen muessen zur **Build**-Zeit
 gesetzt sein, nicht zur Laufzeit: Vite backt sie in das Bundle. Nachtraeglich
 gesetzte Variablen wirken erst nach einem neuen Build.
 
-Die Navigation laeuft ueber Hash-Routing (`#/today`), es braucht also keine
-Rewrite-Regeln. `public/_redirects` und `public/_headers` liegen trotzdem dabei
-— Workers Assets liest beide — falls spaeter auf History-Routing umgestellt wird.
+Die Navigation laeuft ueber Hash-Routing (`#/today`), Rewrite-Regeln braucht es
+also nicht. Falls spaeter auf History-Routing umgestellt wird, uebernimmt
+`not_found_handling: "single-page-application"` in `wrangler.jsonc` den
+Fallback.
+
+**Keine `_redirects` mit `/* /index.html 200` anlegen.** Das ist der uebliche
+SPA-Catch-all bei Cloudflare Pages, aber Workers Assets weist ihn ab: Workers
+entfernt `.html` und `/index` von sich aus, dadurch faellt `/index.html` auf
+`/` zurueck, matcht die Regel erneut und die API antwortet mit
+`Infinite loop detected in this rule`. `public/_headers` ist unproblematisch
+und bleibt.
 
 > Der `anon`-Key gehoert ins Frontend, das ist so vorgesehen. Was ihn absichert,
 > ist RLS — nicht Geheimhaltung. Der **Service-Role-Key** dagegen darf niemals
