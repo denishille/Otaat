@@ -73,9 +73,18 @@ statt überschrieben — was du offline angelegt hast, geht nicht verloren.
 
 | Einstellung | Wert |
 |---|---|
+| Production branch | `main` |
 | Build command | `npm run build` |
 | Output directory | `dist` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+Die Node-Version steht in `.nvmrc`; Cloudflare liest die Datei. Ohne sie baut
+Pages je nach Projektalter mit einer zu alten Node-Version, an der Vite 5
+scheitert.
+
+Nur Pushes auf den **Production Branch** landen auf der eigenen Domain. Jeder
+andere Branch wird als Preview unter einer eigenen `*.pages.dev`-Adresse
+deployed — die Domain bleibt dann auf dem alten Stand, obwohl der Build grün ist.
 
 Die Navigation läuft über Hash-Routing (`#/today`), es braucht also keine
 Rewrite-Regeln. `public/_redirects` liegt trotzdem dabei, falls später auf
