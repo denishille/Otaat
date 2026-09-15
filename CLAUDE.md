@@ -7,6 +7,22 @@ keine Pull Requests, solange nicht ausdrücklich danach gefragt wird.
 Das gilt dauerhaft, auch wenn eine Session mit einem anderen Branch startet:
 dann auf `main` wechseln und die Arbeit dort machen.
 
+### Übergangslösung: zweiter Push auf den alten Branch
+
+Cloudflare baut noch `claude/habit-structure-app-1szmgx`, nicht `main` — der
+Branch wurde beim Anlegen des Projekts festgelegt und zieht nicht nach, wenn
+sich der Default-Branch auf GitHub ändert. Bis das im Dashboard umgestellt
+ist, geht **jeder** Push zusätzlich dorthin, sonst bleibt die Domain stehen:
+
+```bash
+git push origin main
+git push origin main:claude/habit-structure-app-1szmgx
+```
+
+Sobald in Cloudflare unter *Settings → Build → Branch control* `main` steht,
+fällt der zweite Push weg und der alte Branch kann gelöscht werden. Dann auch
+diesen Absatz hier entfernen.
+
 ## Befehle
 
 ```bash
