@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useStore, update, uid, commit } from '../lib/store'
 import type { BoardFrame, BoardNode, NodeColor } from '../lib/types'
 import { goalMomentum } from '../lib/scoring'
-import { Link, Plus, Trash } from '../components/Icons'
+import { ChevR, Link, Plus, Trash } from '../components/Icons'
 import { isTouch } from '../lib/device'
 
 const COLORS: NodeColor[] = ['slate', 'cobalt', 'signal', 'moss', 'plum', 'amber']
@@ -37,6 +37,10 @@ export function Board() {
   const [editingId, setEditingId] = useState<string | null>(null)
   /** Knoten, auf dem der gezogene gerade schwebt — daraus wird beim Loslassen eine Linie. */
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  /** Weiche Fahrt beim Anspringen eines Bereichs — nur dann, sonst ruckelt das Ziehen. */
+  const [gliding, setGliding] = useState(false)
+  const [hotFrame, setHotFrame] = useState<string | null>(null)
+  const [indexOpen, setIndexOpen] = useState(!isTouch)
 
   /** Alle Finger, die gerade auf dem Board liegen. */
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -375,6 +379,57 @@ export function Board() {
     return () => window.removeEventListener('keydown', onKey)
   }, [removeSelected])
 
+  /**
+   * Faehrt so, dass das Rechteck ganz im freien Teil des Bildes liegt.
+   * Links bleibt Platz fuer das Verzeichnis, unten fuer die Werkzeugleiste —
+   * sonst landet genau das, was man anspringt, hinter einem Bedienelement.
+   */
+  function glideTo(x: number, y: number, w: number, h: number, pad = 64) {
+    const r = wrapRef.current!.getBoundingClientRect()
+    if (w <= 0 || h <= 0) return
+
+    const left = indexOpen ? 252 : pad
+    const bottom = 92
+    const availW = Math.max(120, r.width - left - pad)
+    const availH = Math.max(120, r.height - pad - bottom)
+
+    // Ein kleiner Bereich wuerde sonst auf 200 % und mehr aufgeblasen — man
+    // sieht dann zwar ihn, aber nichts von seiner Umgebung mehr.
+    const z = Math.min(1.6, Math.max(MIN_ZOOM, Math.min(availW / w, availH / h)))
+    setGliding(true)
+    setView({
+      z,
+      x: left + (availW - w * z) / 2 - x * z,
+      y: pad + (availH - h * z) / 2 - y * z,
+    })
+    window.setTimeout(() => setGliding(false), 460)
+  }
+
+  /** Umfassendes Rechteck ueber alles, was auf dem Board liegt. */
+  function everything() {
+    const boxes = [
+      ...frames.map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.h })),
+      ...nodes.map((n) => ({ x: n.x, y: n.y, w: n.w, h: sizes[n.id]?.h ?? 48 })),
+    ]
+    if (!boxes.length) return null
+    const x0 = Math.min(...boxes.map((b) => b.x))
+    const y0 = Math.min(...boxes.map((b) => b.y))
+    const x1 = Math.max(...boxes.map((b) => b.x + b.w))
+    const y1 = Math.max(...boxes.map((b) => b.y + b.h))
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+  }
+
+  /** Welche Knoten liegen in einem Bereich — rein geometrisch, ueber den Mittelpunkt. */
+  const nodesIn = (f: BoardFrame) =>
+    nodes.filter((n) => {
+      const sz = sizes[n.id] ?? { w: n.w, h: 48 }
+      const cx = n.x + sz.w / 2
+      const cy = n.y + sz.h / 2
+      return cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.h
+    })
+
+  const looseNodes = nodes.filter((n) => !frames.some((f) => nodesIn(f).includes(n)))
+
   function zoomBy(f: number) {
     const r = wrapRef.current!.getBoundingClientRect()
     const mx = r.width / 2
@@ -406,10 +461,13 @@ export function Board() {
     <div className={'board-wrap' + (drag?.kind === 'pan' ? ' panning' : '')} ref={wrapRef}>
       <div className="board-canvas" onPointerDown={onCanvasDown}
         style={{ backgroundSize: `${26 * view.z}px ${26 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }}>
-        <div className="board-layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+        <div
+          className={'board-layer' + (gliding ? ' board-layer--gliding' : '')}
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
+        >
 
           {frames.map((f) => (
-            <div key={f.id} className={'frame' + (sel?.kind === 'frame' && sel.id === f.id ? ' frame--sel' : '')}
+            <div key={f.id} className={'frame' + (sel?.kind === 'frame' && sel.id === f.id ? ' frame--sel' : '') + (hotFrame === f.id ? ' frame--hot' : '')}
               style={{ left: f.x, top: f.y, width: f.w, height: f.h, borderColor: sel?.kind === 'frame' && sel.id === f.id ? undefined : `var(--n-${f.color})`, opacity: f.color === 'slate' ? 1 : 0.9 }}
               onPointerDown={(e) => onFrameDown(e, f)}>
               <div className="frame-label" contentEditable suppressContentEditableWarning
@@ -514,13 +572,71 @@ export function Board() {
         <div className="eyebrow" style={{ background: 'color-mix(in srgb, var(--surface) 80%, transparent)', padding: '6px 11px', borderRadius: 999, backdropFilter: 'blur(6px)' }}>
           Mind my Business
         </div>
-        <div className="board-hint">
-          {nodes.length === 0
-            ? 'Irgendwo hinklicken und losschreiben'
-            : isTouch
-              ? 'Tippen = neu · einen auf den anderen ziehen = verbinden · zwei Finger = zoomen'
-              : 'Klick = neu · einen auf den anderen ziehen = verbinden · ⌘/Strg + Scroll = Zoom'}
-        </div>
+        {/* Solange nichts da ist, hilft der Hinweis mehr als ein leeres
+            Verzeichnis. Sobald etwas liegt, tauschen die beiden die Plaetze. */}
+        {nodes.length === 0 && frames.length === 0 ? (
+          <div className="board-hint">Irgendwo hinklicken und losschreiben</div>
+        ) : (
+          <div className={'board-index' + (indexOpen ? '' : ' board-index--shut')}>
+            <button className="board-index-head" onClick={() => setIndexOpen((o) => !o)}>
+              <span>Bereiche</span>
+              <span className="mono">{frames.length}</span>
+              <ChevR className={'board-index-caret' + (indexOpen ? ' board-index-caret--open' : '')} />
+            </button>
+
+            {indexOpen && (
+              <div className="board-index-list">
+                {frames.map((f) => {
+                  const inside = nodesIn(f)
+                  return (
+                    <button
+                      key={f.id}
+                      className="board-index-row"
+                      onClick={() => { glideTo(f.x, f.y, f.w, f.h); setSel({ kind: 'frame', id: f.id }) }}
+                      onMouseEnter={() => setHotFrame(f.id)}
+                      onMouseLeave={() => setHotFrame(null)}
+                    >
+                      <i className="board-index-dot" style={{ background: `var(--n-${f.color})` }} />
+                      <span className="board-index-name">{f.label}</span>
+                      <span className="mono">{inside.length}</span>
+                    </button>
+                  )
+                })}
+
+                {frames.length === 0 && (
+                  <div className="board-index-empty">
+                    Noch keine Bereiche. Unten auf <b>Bereich</b> tippen und einen Rahmen um
+                    zusammengehörige Einträge ziehen.
+                  </div>
+                )}
+
+                {looseNodes.length > 0 && (
+                  <button
+                    className="board-index-row board-index-row--loose"
+                    onClick={() => {
+                      const x0 = Math.min(...looseNodes.map((n) => n.x))
+                      const y0 = Math.min(...looseNodes.map((n) => n.y))
+                      const x1 = Math.max(...looseNodes.map((n) => n.x + n.w))
+                      const y1 = Math.max(...looseNodes.map((n) => n.y + (sizes[n.id]?.h ?? 48)))
+                      glideTo(x0, y0, x1 - x0, y1 - y0)
+                    }}
+                  >
+                    <i className="board-index-dot board-index-dot--none" />
+                    <span className="board-index-name">Ohne Bereich</span>
+                    <span className="mono">{looseNodes.length}</span>
+                  </button>
+                )}
+
+                <button
+                  className="board-index-row board-index-row--all"
+                  onClick={() => { const e = everything(); if (e) glideTo(e.x, e.y, e.w, e.h) }}
+                >
+                  Alles zeigen
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="board-toolbar">
