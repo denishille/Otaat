@@ -9,11 +9,6 @@
   --paper-sunk:   #EFECE4;
   --surface:      #FFFFFF;
   --surface-2:    #FBFAF7;
-  /* Der Grund eines Bereichs auf dem Board. Bewusst eigener Token: er bleibt
-     hell, auch wenn die Oberflaechen der App dunkel werden. */
-  --frame-bg:     #FFFFFF;
-  --frame-ink:    #14161C;
-  --frame-line:   #CFCABC;
 
   /* Tinte */
   --ink:          #14161C;
@@ -82,9 +77,6 @@
   --signal-wash:  #382014;
   --good:         #3FBF87;
   --good-wash:    #12291F;
-  --frame-bg:     #F4F3EF;
-  --frame-ink:    #14161C;
-  --frame-line:   #CFCABC;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
   --shadow-2: 0 4px 16px -4px rgba(0, 0, 0, .5);
   --shadow-3: 0 18px 48px -16px rgba(0, 0, 0, .7);
@@ -112,9 +104,6 @@
   --signal-wash:  #382014;
   --good:         #3FBF87;
   --good-wash:    #12291F;
-  --frame-bg:     #F4F3EF;
-  --frame-ink:    #14161C;
-  --frame-line:   #CFCABC;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
   --shadow-2: 0 4px 16px -4px rgba(0, 0, 0, .5);
   --shadow-3: 0 18px 48px -16px rgba(0, 0, 0, .7);
