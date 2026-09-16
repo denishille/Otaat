@@ -30,6 +30,12 @@ export const Moon = (p: P) => (
 export const Link = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}><path d="M6.5 9.5a3 3 0 0 0 4.2 0l1.8-1.8a3 3 0 0 0-4.2-4.2l-1 1M9.5 6.5a3 3 0 0 0-4.2 0L3.5 8.3a3 3 0 0 0 4.2 4.2l1-1" /></svg>
 )
+export const Pencil = (p: P) => (
+  <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}>
+    <path d="M11.1 2.6a1.6 1.6 0 0 1 2.3 2.3L5.6 12.7l-3 .7.7-3Z" />
+    <path d="M10 3.7 12.3 6" />
+  </svg>
+)
 export const Cal = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}><rect x="2" y="3.5" width="12" height="10" rx="2" /><path d="M2 6.5h12M5.5 2v2.5M10.5 2v2.5" /></svg>
 )

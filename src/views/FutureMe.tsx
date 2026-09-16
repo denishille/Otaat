@@ -5,7 +5,7 @@ import { CATALOG, CATALOG_BY_CATEGORY, type Preset } from '../data/catalog'
 import { addDays, addMonths, advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
 import { XP_REMINDER_DONE } from '../lib/xp'
 import { downloadICS } from '../lib/ics'
-import { Cal, Check, Plus, Trash, X } from '../components/Icons'
+import { Cal, Check, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
@@ -137,7 +137,10 @@ export function FutureMe() {
                       <span className="chip-date">{shortDate(r.due)}</span>
                     </button>
                   )}
-                  <button className="fm-drop" onClick={() => drop(r)} aria-label="Abbestellen" title="Abbestellen">
+                  <button className="fm-act" onClick={() => setEditing(r)} aria-label="Bearbeiten" title="Bearbeiten">
+                    <Pencil />
+                  </button>
+                  <button className="fm-act fm-act--drop" onClick={() => drop(r)} aria-label="Abbestellen" title="Abbestellen">
                     <X />
                   </button>
                 </div>

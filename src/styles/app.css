@@ -741,16 +741,16 @@ h2.section-title {
   border-left: 1px solid currentColor;
 }
 
-/* Abbestellen: unaufdringlich, aber ohne Umweg ueber ein Formular. */
-.fm-drop {
-  width: 26px; height: 26px; border-radius: 50%;
+/* Bearbeiten und Abbestellen: unaufdringlich, aber sichtbar — dass der
+   Titel anklickbar ist, sieht man ihm nicht an. */
+.fm-act {
+  width: 28px; height: 28px; border-radius: 50%;
   display: grid; place-items: center;
-  color: var(--ink-4); font-size: 12px;
-  opacity: 0; transition: all .13s;
+  color: var(--ink-4); font-size: 13px;
+  transition: color .13s, background .13s;
 }
-.fm-item:hover .fm-drop { opacity: 1; }
-.fm-drop:hover { color: var(--signal); background: var(--signal-wash); }
-@media (hover: none) { .fm-drop { opacity: .6; } }
+.fm-act:hover { color: var(--ink); background: var(--paper-sunk); }
+.fm-act--drop:hover { color: var(--signal); background: var(--signal-wash); }
 
 .reset-row {
   display: flex; align-items: center; justify-content: space-between;

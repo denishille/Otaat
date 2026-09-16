@@ -384,7 +384,8 @@ export function Board() {
    * Links bleibt Platz fuer das Verzeichnis, unten fuer die Werkzeugleiste —
    * sonst landet genau das, was man anspringt, hinter einem Bedienelement.
    */
-  function glideTo(x: number, y: number, w: number, h: number, pad = 64) {
+  function glideTo(x: number, y: number, w: number, h: number, opts?: { instant?: boolean }) {
+    const pad = 64
     const r = wrapRef.current!.getBoundingClientRect()
     if (w <= 0 || h <= 0) return
 
@@ -396,14 +397,33 @@ export function Board() {
     // Ein kleiner Bereich wuerde sonst auf 200 % und mehr aufgeblasen — man
     // sieht dann zwar ihn, aber nichts von seiner Umgebung mehr.
     const z = Math.min(1.6, Math.max(MIN_ZOOM, Math.min(availW / w, availH / h)))
-    setGliding(true)
+    if (!opts?.instant) {
+      setGliding(true)
+      window.setTimeout(() => setGliding(false), 460)
+    }
     setView({
       z,
       x: left + (availW - w * z) / 2 - x * z,
       y: pad + (availH - h * z) / 2 - y * z,
     })
-    window.setTimeout(() => setGliding(false), 460)
   }
+
+  /**
+   * Beim Oeffnen des Boards einmal alles ins Bild holen. Erst wenn jeder
+   * Knoten gemessen ist — vorher waere seine Hoehe geraten und das Bild
+   * saesse schief. Ohne Ueberblendung, sonst faehrt das Board beim Betreten
+   * sichtbar durch die Gegend.
+   */
+  const didFit = useRef(false)
+  useLayoutEffect(() => {
+    if (didFit.current) return
+    if (nodes.length === 0 && frames.length === 0) return
+    if (nodes.some((n) => !sizes[n.id])) return
+    didFit.current = true
+    const e = everything()
+    if (e) glideTo(e.x, e.y, e.w, e.h, { instant: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, frames, sizes])
 
   /** Umfassendes Rechteck ueber alles, was auf dem Board liegt. */
   function everything() {
