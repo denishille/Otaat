@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
 import { levelFor, titleFor } from './lib/xp'
@@ -28,6 +28,23 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(routeOf)
   const [account, setAccount] = useState(false)
 
+  /* Die Kopfleiste ist auf dem Handy zwei Zeilen hoch, auf dem Desktop eine.
+     Das Board haengt sich an ihre Unterkante. Gemessen statt aus 100dvh
+     gerechnet: auf dem Handy weicht dvh je nach Browserleiste ab, und das
+     Board stand dann bis zu 30 px unter dem Bildschirmrand. */
+  const topbarRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = topbarRef.current
+    if (!el) return
+    const apply = () =>
+      document.documentElement.style.setProperty('--topbar-b', `${Math.round(el.getBoundingClientRect().bottom)}px`)
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    window.addEventListener('resize', apply)
+    return () => { ro.disconnect(); window.removeEventListener('resize', apply) }
+  }, [])
+
   useEffect(() => {
     const onHash = () => setTab(routeOf())
     window.addEventListener('hashchange', onHash)
@@ -51,11 +68,13 @@ export default function App() {
 
   return (
     <div className="shell">
-      <header className="topbar">
+      <header className="topbar" ref={topbarRef}>
         <div className="brand" onClick={() => go('today')} role="button" tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && go('today')}>
+          onKeyDown={(e) => e.key === 'Enter' && go('today')} title="One Thing At A Time">
           <Mark className="brand-mark" />
-          <span className="brand-name">OTAAT</span>
+          <span className="wordmark">
+            <i>O</i>ne <i>T</i>hing <i>A</i>t <i>A</i> <i>T</i>ime
+          </span>
         </div>
 
         <nav className="nav">

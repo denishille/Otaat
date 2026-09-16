@@ -34,6 +34,8 @@ export function Board() {
   const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null)
   const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+  /** Knoten, auf dem der gezogene gerade schwebt — daraus wird beim Loslassen eine Linie. */
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
 
   /** Alle Finger, die gerade auf dem Board liegen. */
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -244,6 +246,12 @@ export function Board() {
           const n = d.nodes.find((x) => x.id === drag.id)
           if (n) { n.x = drag.origin.x + dx / viewRef.current.z; n.y = drag.origin.y + dy / viewRef.current.z }
         }, { transient: true })
+        // Einen Knoten auf einen anderen ziehen verbindet die beiden.
+        if (drag.moved) {
+          const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-node]')
+          const over = el?.getAttribute('data-node')
+          setDropTarget(over && over !== drag.id ? over : null)
+        }
       } else if (drag.kind === 'frame') {
         update((d) => {
           const f = d.frames.find((x) => x.id === drag.id)
@@ -279,6 +287,24 @@ export function Board() {
         }
         setWire(null)
       }
+      if (drag.kind === 'node' && dropTarget && dropTarget !== drag.id) {
+        const from = drag.id!
+        const to = dropTarget
+        update((d) => {
+          // Der gezogene Knoten springt zurueck — die Geste war das Verbinden,
+          // nicht das Verschieben. Sonst laegen die beiden uebereinander.
+          const n = d.nodes.find((x) => x.id === from)
+          if (n) { n.x = drag.origin.x; n.y = drag.origin.y }
+          const exists = d.edges.some(
+            (g) => (g.from === from && g.to === to) || (g.from === to && g.to === from),
+          )
+          if (!exists) d.edges.push({ id: uid(), from, to })
+        })
+        setDropTarget(null)
+        setDrag(null)
+        return
+      }
+      setDropTarget(null)
       commit()
       // Erster Klick raeumt die Auswahl ab, der naechste legt an — auf der
       // freien Flaeche wie innerhalb eines Bereichs.
@@ -311,7 +337,7 @@ export function Board() {
       window.removeEventListener('pointercancel', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag, wire, sel, edges])
+  }, [drag, wire, sel, edges, dropTarget])
 
   /* ------------------ Zoom & Tasten ------------------ */
 
@@ -429,7 +455,8 @@ export function Board() {
                   'node' +
                   (isSel ? ' node--sel' : '') +
                   (n.isGoal ? ' node--goal' : '') +
-                  (drag?.kind === 'node' && drag.id === n.id ? ' node--dragging' : '')
+                  (drag?.kind === 'node' && drag.id === n.id ? ' node--dragging' : '') +
+                  (dropTarget === n.id ? ' node--drop' : '')
                 }
                 style={{
                   left: n.x, top: n.y, width: n.w,
@@ -481,8 +508,8 @@ export function Board() {
           {nodes.length === 0
             ? 'Irgendwo hinklicken und losschreiben'
             : touchLike
-              ? 'Tippen = neu · Ziehen = schieben · zwei Finger = zoomen'
-              : 'Klick = neu · Ziehen = schieben · Punkt rechts = verbinden · ⌘/Strg + Scroll = Zoom'}
+              ? 'Tippen = neu · einen auf den anderen ziehen = verbinden · zwei Finger = zoomen'
+              : 'Klick = neu · einen auf den anderen ziehen = verbinden · ⌘/Strg + Scroll = Zoom'}
         </div>
       </div>
 

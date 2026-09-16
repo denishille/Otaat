@@ -8,12 +8,14 @@ import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
 import { ChevL, ChevR, Grip, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
+import { CheckStats } from './CheckStats'
 import { toast } from '../components/Toasts'
 
 export function Today() {
   const { state } = useStore()
   const [date, setDate] = useState(today())
   const [editing, setEditing] = useState<CheckDef | null>(null)
+  const [stats, setStats] = useState<CheckDef | null>(null)
   const [adding, setAdding] = useState(false)
 
   const defs = activeChecks(state)
@@ -147,9 +149,6 @@ export function Today() {
     <>
       <div className="today-head">
         <div>
-          <div className="wordmark">
-            <i>O</i>ne <i>T</i>hing <i>A</i>t <i>A</i> <i>T</i>ime
-          </div>
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
@@ -186,7 +185,7 @@ export function Today() {
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
             streak={checkStreak(state, def, date)}
             onChange={(v) => setValue(def, v)}
-            onEdit={() => setEditing(def)}
+            onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
           />
         ))}
@@ -207,6 +206,15 @@ export function Today() {
         >
           {defs.find((d) => d.id === reorder.id)?.name}
         </div>
+      )}
+
+      {stats && (
+        <CheckStats
+          state={state}
+          def={stats}
+          onClose={() => setStats(null)}
+          onEdit={() => { setEditing(stats); setStats(null) }}
+        />
       )}
 
       {(editing || adding) && (
@@ -231,11 +239,11 @@ interface CardProps {
   dragging: boolean
   onGrip: (e: React.PointerEvent) => void
   onChange: (v: CheckValue) => void
-  onEdit: () => void
+  onOpen: () => void
   onAddOption: (option: string) => void
 }
 
-function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onEdit, onAddOption }: CardProps) {
+function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption }: CardProps) {
   const filled = isFilled(value)
 
   return (
@@ -244,7 +252,7 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
       className={'check' + (filled ? ' check--filled' : '') + (dragging ? ' check--moving' : '')}
     >
       <div className="check-top">
-        <button onClick={onEdit} className="check-name" style={{ textAlign: 'left' }} title="Bearbeiten">{def.name}</button>
+        <button onClick={onOpen} className="check-name" style={{ textAlign: 'left' }} title="Statistik ansehen">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
           {def.unit && <span className="check-unit">{def.unit}</span>}

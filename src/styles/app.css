@@ -43,12 +43,11 @@ a { color: var(--cobalt); text-decoration: none; }
 }
 
 .brand {
-  display: flex; align-items: baseline; gap: 9px;
-  font-family: var(--display); font-weight: 700; font-size: 22px;
-  letter-spacing: -.035em; user-select: none;
+  display: flex; align-items: center; gap: 10px;
+  user-select: none; cursor: pointer; min-width: 0;
 }
 .brand-mark {
-  font-size: 21px; color: var(--ink-3); align-self: center;
+  font-size: 22px; color: var(--ink-3); flex-shrink: 0;
   transition: transform .6s cubic-bezier(.2,.9,.2,1);
 }
 .brand:hover .brand-mark { transform: rotate(45deg); }
@@ -73,16 +72,16 @@ a { color: var(--cobalt); text-decoration: none; }
 
 /* Der Name ausgeschrieben, in einer Farbe. Die Anfangsbuchstaben stehen
    groesser und schwerer — so springt OTAAT ueber die Form heraus statt ueber
-   einen zweiten Farbton. */
+   einen zweiten Farbton. Steht in der Kopfleiste, also auf jeder Seite. */
 .wordmark {
-  font-family: var(--display); color: var(--ink-3);
-  font-size: 13px; font-weight: 400;
-  letter-spacing: .16em; text-transform: uppercase;
-  line-height: 1;
+  font-family: var(--display); color: var(--ink);
+  font-size: 12px; font-weight: 400;
+  letter-spacing: .15em; text-transform: uppercase;
+  line-height: 1; white-space: nowrap;
 }
 .wordmark i {
   font-style: normal; font-weight: 700;
-  font-size: 19px; letter-spacing: .04em;
+  font-size: 18px; letter-spacing: .03em;
 }
 
 .eyebrow {
@@ -298,6 +297,73 @@ h2.section-title {
 .choice button:hover { border-color: var(--ink-3); color: var(--ink); }
 .choice button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
+/* Statistik einer Kategorie */
+.stat-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.stat-tile { background: var(--surface); padding: 13px 15px; }
+.stat-tile-v {
+  font-family: var(--display); font-weight: 600; font-size: 23px;
+  letter-spacing: -.02em; margin-top: 2px;
+}
+.stat-tile-v small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+
+.chart-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.chart-head h4 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px;
+  letter-spacing: -.015em;
+}
+.chart-note { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+
+.chart { display: flex; flex-direction: column; gap: 8px; }
+.chart-plot {
+  position: relative;
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 120px; padding: 0 2px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.chart-plot--wide { gap: 10px; height: 130px; }
+
+/* Ein Balken je Tag: schmal, mit abgerundetem Kopf, auf der Grundlinie sitzend. */
+.chart-bar {
+  flex: 1; min-width: 3px;
+  background: var(--cobalt);
+  border-radius: 4px 4px 0 0;
+  transition: opacity .12s;
+}
+.chart-bar:hover { opacity: .7; }
+.chart-bar--empty { background: var(--line-strong); border-radius: 2px; }
+
+.chart-legend { display: flex; gap: 10px; }
+.chart-legend span {
+  flex: 1; display: flex; flex-direction: column; gap: 1px;
+  text-align: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+}
+.chart-legend b { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+
+/* Die Ziellinie ist Beiwerk, keine zweite Datenreihe — deshalb Textfarbe. */
+.chart-target {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px dashed var(--ink-4);
+  pointer-events: none;
+}
+.chart-target span {
+  position: absolute; right: 0; top: -15px;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  background: var(--surface); padding: 0 4px;
+}
+
+.chart-axis {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+}
+
 /* Reihenfolge aendern */
 .grip {
   display: grid; place-items: center;
@@ -417,6 +483,73 @@ h2.section-title {
 }
 .insights-progress > span:first-child { flex: 1 1 260px; min-width: 0; }
 .insights-progress .xp-track { width: 120px; flex-shrink: 0; }
+
+/* Statistik einer Kategorie */
+.stat-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.stat-tile { background: var(--surface); padding: 13px 15px; }
+.stat-tile-v {
+  font-family: var(--display); font-weight: 600; font-size: 23px;
+  letter-spacing: -.02em; margin-top: 2px;
+}
+.stat-tile-v small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+
+.chart-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.chart-head h4 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px;
+  letter-spacing: -.015em;
+}
+.chart-note { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+
+.chart { display: flex; flex-direction: column; gap: 8px; }
+.chart-plot {
+  position: relative;
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 120px; padding: 0 2px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.chart-plot--wide { gap: 10px; height: 130px; }
+
+/* Ein Balken je Tag: schmal, mit abgerundetem Kopf, auf der Grundlinie sitzend. */
+.chart-bar {
+  flex: 1; min-width: 3px;
+  background: var(--cobalt);
+  border-radius: 4px 4px 0 0;
+  transition: opacity .12s;
+}
+.chart-bar:hover { opacity: .7; }
+.chart-bar--empty { background: var(--line-strong); border-radius: 2px; }
+
+.chart-legend { display: flex; gap: 10px; }
+.chart-legend span {
+  flex: 1; display: flex; flex-direction: column; gap: 1px;
+  text-align: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+}
+.chart-legend b { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+
+/* Die Ziellinie ist Beiwerk, keine zweite Datenreihe — deshalb Textfarbe. */
+.chart-target {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px dashed var(--ink-4);
+  pointer-events: none;
+}
+.chart-target span {
+  position: absolute; right: 0; top: -15px;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  background: var(--surface); padding: 0 4px;
+}
+
+.chart-axis {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+}
 
 /* Reihenfolge aendern */
 .grip {
@@ -618,8 +751,12 @@ h2.section-title {
 /* dvh statt vh wegen der einklappenden Browserleiste auf dem iPhone; die
    Safe-Area-Insets kommen raus, weil das Board bis an die Kante laeuft. */
 .board-wrap {
-  position: relative;
-  height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  /* Fest am Bildschirm statt im Fluss: so endet das Board exakt am unteren
+     Rand, ohne dass eine Viewport-Einheit geraten werden muss. */
+  position: fixed;
+  left: 0; right: 0;
+  top: var(--topbar-b, 64px);
+  bottom: env(safe-area-inset-bottom, 0px);
   overflow: hidden;
   background: var(--paper-sunk);
 }
@@ -651,7 +788,12 @@ h2.section-title {
 }
 .node:hover { box-shadow: var(--shadow-3); }
 .node--sel { border-color: var(--cobalt); box-shadow: 0 0 0 2px var(--cobalt-wash), var(--shadow-3); }
-.node--dragging { cursor: grabbing; box-shadow: var(--shadow-3); }
+.node--dragging { cursor: grabbing; box-shadow: var(--shadow-3); opacity: .85; }
+/* Der Knoten, auf dem gerade losgelassen wuerde. */
+.node--drop {
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 3px var(--cobalt-wash), var(--shadow-3);
+}
 .node-accent { position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; }
 .node-text {
   font-size: 13.5px; line-height: 1.42; white-space: pre-wrap; word-break: break-word;
@@ -768,7 +910,10 @@ h2.section-title {
   padding: 20px 22px 16px; border-bottom: 1px solid var(--line);
 }
 .sheet-head h3 { font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: -.02em; margin: 0; }
-.sheet-body { padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.sheet-body { padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+/* Ohne das drueckt der Flex-Container Kacheln und Diagramme zusammen,
+   sobald der Inhalt laenger wird als das Blatt. */
+.sheet-body > * { flex-shrink: 0; }
 .sheet-foot {
   display: flex; align-items: center; gap: 10px; justify-content: flex-end;
   padding: 14px 22px; border-top: 1px solid var(--line); background: var(--surface-2);
@@ -823,12 +968,18 @@ h2.section-title {
   .board-toolbar .btn { padding: 6px 9px; }
   .swatch { width: 26px; height: 26px; }
   .swatch i { width: 17px; height: 17px; }
-  .topbar { padding: 0 14px; gap: 8px; height: 58px; }
-  .nav { margin-left: 0; overflow-x: auto; scrollbar-width: none; }
+  .topbar {
+    padding: 8px 14px; gap: 8px 10px; height: auto;
+    flex-wrap: wrap; align-items: center;
+  }
+  .brand { order: 1; }
+  .topbar-right { order: 2; }
+  /* Der Name steht oben, die Seiten darunter — sonst passt beides nicht nebeneinander. */
+  .nav { order: 3; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
+  .wordmark { font-size: 10.5px; letter-spacing: .13em; }
+  .wordmark i { font-size: 15px; }
   .nav::-webkit-scrollbar { display: none; }
   .nav-item { padding: 6px 9px; font-size: 13px; }
-  .brand { font-size: 21px; }
-  .brand-name { display: none; }
   .topbar-right { gap: 6px; }
   /* Level und XP stehen auf kleinen Screens im Konto-Sheet, nicht in der Leiste. */
   .xp { display: none; }
@@ -837,7 +988,6 @@ h2.section-title {
   .check-grid { grid-template-columns: 1fr; }
   .fm-item { grid-template-columns: auto 1fr; row-gap: 10px; }
   .fm-right { grid-column: 2; }
-  .board-wrap { height: calc(100dvh - 58px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .sheet { max-height: 88vh; }
   .scrim { padding: 12px; align-items: flex-end; }
 }
