@@ -39,6 +39,7 @@ export function numeric(def: CheckDef, v: CheckValue | undefined): number | null
       return v === true ? 1 : 0
     case 'scale':
     case 'number':
+    case 'external':
       return typeof v === 'number' ? v : null
     case 'multi': {
       // "hat ueberhaupt was gemacht" — verstaendlicher als die Anzahl der Haken

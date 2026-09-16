@@ -4,7 +4,7 @@ export type ID = string
 
 /* ---------- Everything Checker ---------- */
 
-export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'multi' | 'text'
+export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'multi' | 'text' | 'external'
 
 export interface CheckDef {
   id: ID
@@ -18,6 +18,8 @@ export interface CheckDef {
   noneOption?: string
   /** Startwert fuer einen frischen Tag, wenn es noch keinen Vortag gibt */
   fallback?: CheckValue
+  /** Woher die Werte kommen, wenn kind === 'external'. Nicht editierbar. */
+  source?: 'brudi'
   /** Schrittweite fuer kind === 'number' */
   step?: number
   /** Ab diesem Wert zaehlt der Tag als "erfuellt" (number/scale). Bei bool: true. */

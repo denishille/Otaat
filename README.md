@@ -116,6 +116,28 @@ und bleibt.
 > in den Build; er wird ausschliesslich in der Edge Function verwendet, wo
 > Supabase ihn automatisch injiziert.
 
+## Essen kommt von woanders
+
+Die Rubrik **Essen** im Everything Checker wird nicht von Hand gepflegt: sie
+liest die Kalorien des Tages aus dem Kalorienbrudi-Bestand, der im selben
+Supabase-Projekt liegt. Die Werte landen wie jeder andere Check im Tagesbestand,
+zaehlen also in Serien, Statistik und Zusammenhaenge mit hinein.
+
+Gelesen wird ausschliesslich die View `brudi_tag_public` aus
+[`supabase/migrations/0002`](supabase/migrations/0002_brudi_tag_public.sql):
+Datum, Kalorien, Tagesziel. **Kein** Gewicht, keine Symptome, keine
+Lebensmittelliste, nichts aus dem Kosmetikstudio. Die drei Basistabellen
+bleiben fuer den oeffentlichen Schluessel gesperrt -- RLS ist dort an, und es
+gibt keine Policy.
+
+Diese drei Spalten sind damit bewusst oeffentlich lesbar: der Schluessel steht
+im ausgelieferten Bundle. Das war die Abwaegung gegen eine Anmeldung -- soll es
+doch hinter einen Login, braucht `tagesuebersicht` eine Policy fuer
+`authenticated` und die View faellt weg.
+
+Quelle und Schluessel stehen in `src/data/brudi-source.ts` und lassen sich ueber
+`VITE_BRUDI_URL` / `VITE_BRUDI_KEY` ueberschreiben.
+
 ## Kalender (Apple)
 
 Zwei Wege, beide unter **Future Me Problems → Kalender**:

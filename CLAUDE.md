@@ -34,6 +34,7 @@ schlägt bei Typfehlern fehl.
 | `src/data/catalog.ts` | Das Regal — Vorlagen für Future Me Problems |
 | `src/styles/tokens.css` | Alle Farben. Dark Mode ist eine Umdefinition derselben Variablen. |
 | `supabase/migrations/` | Schema, Indizes, RLS |
+| `src/data/brudi-source.ts` | Quelle der Essens-Rubrik. Liest nur die View `brudi_tag_public` (Datum, Kalorien, Ziel) — nie `tagesuebersicht` direkt, dort stehen Gewicht und Symptome. |
 | `wrangler.jsonc` | Cloudflare-Deploy. `build.command` baut, `assets.directory` ist `dist/`. Der `name` muss dem Worker in Cloudflare entsprechen. SPA-Fallback über `not_found_handling` — **keine `_redirects` mit `/* /index.html 200`**, die weist Workers Assets als Endlosschleife ab. |
 
 ## Design

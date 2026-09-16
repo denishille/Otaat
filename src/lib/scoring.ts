@@ -14,7 +14,8 @@ export function meetsTarget(def: CheckDef, v: CheckValue | undefined): boolean {
     case 'bool':
       return v === true
     case 'scale':
-    case 'number': {
+    case 'number':
+    case 'external': {
       if (typeof v !== 'number') return false
       if (def.target === undefined) return true
       return def.inverse ? v <= def.target : v >= def.target
@@ -42,6 +43,9 @@ const CARRY_WINDOW = 30
 export function carriedDefaults(s: AppState, date: string): Record<string, CheckValue> {
   const out: Record<string, CheckValue> = {}
   for (const def of activeChecks(s)) {
+    // Gelesene Rubriken holen ihre Werte selbst — ein Vortagswert waere hier
+    // eine Erfindung.
+    if (def.kind === 'external') continue
     let found: CheckValue | undefined
     for (let i = 1; i <= CARRY_WINDOW; i++) {
       const v = s.days[addDays(date, -i)]?.values[def.id]

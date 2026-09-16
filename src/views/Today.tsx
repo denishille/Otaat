@@ -5,6 +5,7 @@ import { SCALE_LABELS } from '../data/checks'
 import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scoreDay, streak } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
+import { fetchBrudi } from '../lib/brudi'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
@@ -25,6 +26,42 @@ export function Today() {
   const run = streak(state)
   const goals = state.nodes.filter((n) => n.isGoal)
   const carried = useMemo(() => carriedDefaults(state, date), [state, date])
+
+  /**
+   * Die Essens-Rubrik zieht ihre Werte aus dem Kalorienbrudi-Bestand und
+   * schreibt sie in die Tage — dadurch rechnen Statistik und Zusammenhaenge
+   * damit wie mit jedem anderen Check, und es steht auch ohne Netz noch da.
+   */
+  const external = defs.filter((d) => d.kind === 'external')
+  const [brudiState, setBrudiState] = useState<'idle' | 'laden' | 'fehler'>('idle')
+
+  useEffect(() => {
+    if (!external.length) return
+    const ctrl = new AbortController()
+    setBrudiState('laden')
+    void fetchBrudi(addDays(today(), -180), ctrl.signal).then((rows) => {
+      if (ctrl.signal.aborted) return
+      setBrudiState(rows.length ? 'idle' : 'fehler')
+      if (!rows.length) return
+
+      const def = external.find((d) => d.source === 'brudi')
+      if (!def) return
+
+      update((d) => {
+        for (const row of rows) {
+          const day = (d.days[row.date] ??= { date: row.date, values: {}, awarded: [] })
+          if (day.values[def.id] !== row.kcal) day.values[def.id] = row.kcal
+        }
+        // Das Tagesziel kommt aus derselben Quelle — sonst bewertet OTAAT
+        // gegen eine Zahl, die dort laengst geaendert wurde.
+        const latest = [...rows].reverse().find((r) => r.target !== null)
+        const c = d.checks.find((x) => x.id === def.id)
+        if (c && latest?.target != null && c.target !== latest.target) c.target = latest.target
+      })
+    })
+    return () => ctrl.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [external.length])
 
   /**
    * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,
@@ -214,6 +251,7 @@ export function Today() {
             onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
             onRemoveOption={(o) => removeOption(def, o)}
+            externalState={def.kind === 'external' ? brudiState : undefined}
           />
         ))}
 
@@ -269,9 +307,11 @@ interface CardProps {
   onOpen: () => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
+  /** nur bei gelesenen Rubriken gesetzt */
+  externalState?: 'idle' | 'laden' | 'fehler'
 }
 
-function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption }: CardProps) {
+function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
   const filled = isFilled(value)
 
   return (
@@ -288,7 +328,7 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} onRemoveOption={onRemoveOption} />
+      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -305,14 +345,17 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
   )
 }
 
-function Input({ def, value, onChange, onAddOption, onRemoveOption }: {
+function Input({ def, value, onChange, onAddOption, onRemoveOption, externalState }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
+  externalState?: 'idle' | 'laden' | 'fehler'
 }) {
   switch (def.kind) {
+    case 'external':
+      return <ExternalValue def={def} value={value} state={externalState} />
     case 'bool':
       return (
         <div className="bool">
@@ -363,6 +406,42 @@ function Input({ def, value, onChange, onAddOption, onRemoveOption }: {
         />
       )
   }
+}
+
+/** Gelesene Rubrik: zeigt nur an, was die Quelle liefert. */
+function ExternalValue({ def, value, state }: {
+  def: CheckDef
+  value: CheckValue
+  state?: 'idle' | 'laden' | 'fehler'
+}) {
+  const n = typeof value === 'number' ? value : null
+  const target = def.target
+
+  if (n === null) {
+    return (
+      <div className="ext ext--empty">
+        {state === 'laden' ? 'wird geholt …' : state === 'fehler' ? 'Quelle nicht erreichbar' : 'für diesen Tag nichts erfasst'}
+      </div>
+    )
+  }
+
+  const over = target !== undefined && n > target
+  const pct = target ? Math.min(100, (n / target) * 100) : 0
+
+  return (
+    <div className="ext">
+      <div className="ext-row">
+        <span className="ext-value">{Math.round(n)}</span>
+        {target !== undefined && <span className="ext-target">/ {Math.round(target)}</span>}
+      </div>
+      {target !== undefined && (
+        <div className="ext-bar">
+          <i className={over ? 'ext-bar--over' : undefined} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <div className="ext-note">aus Kalorienbrudi</div>
+    </div>
+  )
 }
 
 function MultiInput({ def, value, onChange, onAddOption, onRemoveOption }: {
@@ -608,14 +687,22 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
         />
       </div>
 
-      <div className="field">
-        <label>Eingabe</label>
-        <div className="choice">
-          {KINDS.map(({ k, label }) => (
-            <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{label}</button>
-          ))}
+      {kind === 'external' ? (
+        <p className="chart-note" style={{ margin: 0 }}>
+          Diese Rubrik holt ihre Werte selbst aus dem Kalorienbrudi-Bestand und
+          lässt sich nicht von Hand eintragen. Name, Zielwert und die Verknüpfung
+          mit Board-Zielen kannst du trotzdem ändern.
+        </p>
+      ) : (
+        <div className="field">
+          <label>Eingabe</label>
+          <div className="choice">
+            {KINDS.map(({ k, label }) => (
+              <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{label}</button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {(kind === 'choice' || kind === 'multi') && (
         <div className="field">
@@ -631,7 +718,7 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
         </div>
       )}
 
-      {(kind === 'number' || kind === 'scale') && (
+      {(kind === 'number' || kind === 'scale' || kind === 'external') && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
           <div className="field" style={{ flex: 1 }}>
             <label htmlFor="ce-target">{inverse ? 'Höchstens' : 'Mindestens'}</label>

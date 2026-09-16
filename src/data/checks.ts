@@ -16,6 +16,11 @@ export const DEFAULT_CHECKS: CheckDef[] = [
   { id: 'sport',    name: 'Sport',         kind: 'multi',  sort: 30,
     options: ['Kraft', 'Cardio', 'Mobility', 'Ballsport', 'Draußen', 'Nix'],
     noneOption: 'Nix' },
+  // Kommt aus dem Kalorienbrudi-Bestand und wird nicht von Hand gepflegt.
+  // Eigene id statt der alten 'food': das war eine 1-5-Skala, hier stehen
+  // Kilokalorien — in einer Reihe waeren die beiden nicht vergleichbar.
+  { id: 'brudi_kcal', name: 'Essen', kind: 'external', source: 'brudi',
+    unit: 'kcal', target: 1900, inverse: true, sort: 35 },
   { id: 'mood',     name: 'Laune',         kind: 'scale',  target: 4, sort: 40 },
   { id: 'focus',    name: 'Fokus',         kind: 'scale',  target: 4, sort: 50 },
   { id: 'people',   name: 'Unter Menschen',kind: 'bool',   sort: 60 },

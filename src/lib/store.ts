@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 3
+const STATE_VERSION = 4
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
@@ -147,6 +147,9 @@ export function migrate(s: AppState): AppState {
     const old = byId.get(def.id)
     return old?.goals?.length ? { ...def, goals: old.goals } : { ...def }
   })
+
+  // Das alte 'food' war eine 1-5-Skala und bleibt archiviert — die neue
+  // Rubrik 'brudi_kcal' zaehlt Kilokalorien und faengt bei null an.
 
   // Abgeschaffte Checks: mit Daten ins Archiv, ohne Daten raus
   for (const id of RETIRED_CHECK_IDS) {
