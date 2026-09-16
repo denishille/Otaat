@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 2
+const STATE_VERSION = 3
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
@@ -125,15 +125,21 @@ export function migrate(s: AppState): AppState {
 
   const byId = new Map(s.checks.map((c) => [c.id, c]))
 
-  // Sport war eine Einfachauswahl und ist jetzt eine Mehrfachauswahl;
-  // Mobility war ein eigener Check und ist jetzt eine Option darin.
   for (const day of Object.values(s.days)) {
+    // Sport war eine Einfachauswahl und ist jetzt eine Mehrfachauswahl;
+    // Mobility war ein eigener Check und ist jetzt eine Option darin.
     const sport = day.values['sport']
     const picked: string[] = Array.isArray(sport) ? [...sport] : typeof sport === 'string' ? [sport] : []
     if (day.values['mobility'] === true && !picked.includes('Mobility')) picked.push('Mobility')
     if (picked.length) day.values['sport'] = picked
     delete day.values['mobility']
     delete day.values['food']
+
+    // Doomscrolling waren Stunden und ist jetzt eine Skala. Die alten Werte
+    // liegen in derselben Groessenordnung, gerundet und auf 1..5 begrenzt
+    // bleiben sie brauchbar, statt sie wegzuwerfen.
+    const scroll = day.values['scroll']
+    if (typeof scroll === 'number') day.values['scroll'] = Math.max(1, Math.min(5, Math.round(scroll) || 1))
   }
 
   // Aktuelle Definitionen uebernehmen, die Verknuepfungen zu Board-Zielen behalten

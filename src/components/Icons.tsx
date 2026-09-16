@@ -33,6 +33,13 @@ export const Link = (p: P) => (
 export const Cal = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}><rect x="2" y="3.5" width="12" height="10" rx="2" /><path d="M2 6.5h12M5.5 2v2.5M10.5 2v2.5" /></svg>
 )
+export const Grip = (p: P) => (
+  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" {...p}>
+    <circle cx="6" cy="4" r="1.15" /><circle cx="10" cy="4" r="1.15" />
+    <circle cx="6" cy="8" r="1.15" /><circle cx="10" cy="8" r="1.15" />
+    <circle cx="6" cy="12" r="1.15" /><circle cx="10" cy="12" r="1.15" />
+  </svg>
+)
 export const Dots = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" {...p}><circle cx="4" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12" cy="8" r="1.3" /></svg>
 )

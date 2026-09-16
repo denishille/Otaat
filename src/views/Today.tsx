@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
@@ -6,7 +6,7 @@ import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scor
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
-import { ChevL, ChevR, Mark, Plus, Trash } from '../components/Icons'
+import { ChevL, ChevR, Grip, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toasts'
 
@@ -67,6 +67,72 @@ export function Today() {
     }
   }
 
+  /* ---- Reihenfolge per Griff ---- */
+
+  const cardRefs = useRef(new Map<string, HTMLDivElement | null>())
+  const [reorder, setReorder] = useState<{ id: string; x: number; y: number; order: string[] } | null>(null)
+
+  const shownDefs = reorder
+    ? (reorder.order.map((id) => defs.find((d) => d.id === id)).filter(Boolean) as CheckDef[])
+    : defs
+
+  function startReorder(e: React.PointerEvent, id: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setReorder({ id, x: e.clientX, y: e.clientY, order: defs.map((d) => d.id) })
+  }
+
+  useEffect(() => {
+    if (!reorder) return
+
+    const onMove = (e: PointerEvent) => {
+      setReorder((cur) => {
+        if (!cur) return cur
+        const from = cur.order.indexOf(cur.id)
+        let to = from
+        // Die Karte, ueber der der Finger gerade steht, bestimmt den Platz.
+        for (let i = 0; i < cur.order.length; i++) {
+          if (i === from) continue
+          const el = cardRefs.current.get(cur.order[i])
+          if (!el) continue
+          const r = el.getBoundingClientRect()
+          if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+            to = i
+            break
+          }
+        }
+        const order = [...cur.order]
+        if (to !== from) {
+          order.splice(to, 0, ...order.splice(from, 1))
+        }
+        return { ...cur, x: e.clientX, y: e.clientY, order }
+      })
+    }
+
+    const onUp = () => {
+      setReorder((cur) => {
+        if (cur) {
+          update((d) => {
+            cur.order.forEach((id, i) => {
+              const c = d.checks.find((x) => x.id === id)
+              if (c) c.sort = (i + 1) * 10
+            })
+          })
+        }
+        return null
+      })
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [reorder?.id])
+
   /** Neue Sportart o.ae. direkt in der Karte anlegen. */
   function addOption(def: CheckDef, option: string) {
     const clean = option.trim()
@@ -82,10 +148,7 @@ export function Today() {
       <div className="today-head">
         <div>
           <div className="wordmark">
-            <Mark />
-            <span>
-              <i>O</i>ne <i>T</i>hing <i>A</i>t <i>A</i> <i>T</i>ime
-            </span>
+            <i>O</i>ne <i>T</i>hing <i>A</i>t <i>A</i> <i>T</i>ime
           </div>
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
@@ -112,9 +175,12 @@ export function Today() {
 
 
       <div className="check-grid">
-        {defs.map((def) => (
+        {shownDefs.map((def) => (
           <CheckCard
             key={def.id}
+            cardRef={(el) => cardRefs.current.set(def.id, el)}
+            dragging={reorder?.id === def.id}
+            onGrip={(e) => startReorder(e, def.id)}
             def={def}
             value={entry?.values[def.id] ?? null}
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
@@ -134,6 +200,15 @@ export function Today() {
         </button>
       </div>
 
+      {reorder && (
+        <div
+          className="drag-ghost"
+          style={{ left: reorder.x, top: reorder.y }}
+        >
+          {defs.find((d) => d.id === reorder.id)?.name}
+        </div>
+      )}
+
       {(editing || adding) && (
         <CheckEditor
           def={editing}
@@ -152,21 +227,28 @@ interface CardProps {
   value: CheckValue
   goalNames: { text: string; color: string }[]
   streak: number
+  cardRef: (el: HTMLDivElement | null) => void
+  dragging: boolean
+  onGrip: (e: React.PointerEvent) => void
   onChange: (v: CheckValue) => void
   onEdit: () => void
   onAddOption: (option: string) => void
 }
 
-function CheckCard({ def, value, goalNames, streak: s, onChange, onEdit, onAddOption }: CardProps) {
+function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onEdit, onAddOption }: CardProps) {
   const filled = isFilled(value)
 
   return (
-    <div className={'check' + (filled ? ' check--filled' : '')}>
+    <div
+      ref={cardRef}
+      className={'check' + (filled ? ' check--filled' : '') + (dragging ? ' check--moving' : '')}
+    >
       <div className="check-top">
         <button onClick={onEdit} className="check-name" style={{ textAlign: 'left' }} title="Bearbeiten">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
           {def.unit && <span className="check-unit">{def.unit}</span>}
+          <button className="grip" onPointerDown={onGrip} aria-label="Verschieben" title="Verschieben"><Grip /></button>
         </div>
       </div>
 
