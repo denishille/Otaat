@@ -1,6 +1,6 @@
 import type { AppState, CheckDef } from './types'
 import { addDays, fromISO, today } from './dates'
-import { meetsTarget } from './scoring'
+import { countedValues, meetsTarget } from './scoring'
 import { numeric } from './insights'
 
 /* Zahlen zu einem einzelnen Check. Alles hier arbeitet auf derselben
@@ -18,7 +18,7 @@ export function series(s: AppState, def: CheckDef, days: number, from = today())
   const out: Point[] = []
   for (let i = days - 1; i >= 0; i--) {
     const date = addDays(from, -i)
-    const raw = s.days[date]?.values[def.id]
+    const raw = countedValues(s, date)[def.id]
     out.push({ date, value: numeric(def, raw), met: meetsTarget(def, raw) })
   }
   return out

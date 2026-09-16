@@ -48,11 +48,31 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
     if (def.kind === 'external') continue
     let found: CheckValue | undefined
     for (let i = 1; i <= CARRY_WINDOW; i++) {
-      const v = s.days[addDays(date, -i)]?.values[def.id]
+      // Nur aus bestaetigten Tagen uebernehmen — sonst wird ein Vorschlag
+      // aus einem Vorschlag abgeleitet.
+      const v = countedValues(s, addDays(date, -i))[def.id]
       if (isFilled(v)) { found = v; break }
     }
     const value = found ?? def.fallback
     if (isFilled(value)) out[def.id] = value as CheckValue
+  }
+  return out
+}
+
+/**
+ * Die Werte eines Tages, soweit sie zaehlen.
+ *
+ * Ein Tag zaehlt, sobald er bestaetigt ist. Gemessene Rubriken — die Kalorien
+ * aus dem Kalorienbrudi-Bestand — zaehlen immer: die sind keine Annahme,
+ * sondern kommen aus einer anderen Erfassung.
+ */
+export function countedValues(s: AppState, date: string): Record<string, CheckValue> {
+  const day = s.days[date]
+  if (!day) return {}
+  if (day.confirmed) return day.values
+  const out: Record<string, CheckValue> = {}
+  for (const def of s.checks) {
+    if (def.kind === 'external' && isFilled(day.values[def.id])) out[def.id] = day.values[def.id]
   }
   return out
 }
@@ -71,6 +91,8 @@ export interface DayScore {
 
 export function scoreDay(s: AppState, date: string): DayScore {
   const defs = activeChecks(s)
+  // Die Kopfzeile zeigt, was im Formular steht — auch unbestaetigt. Nur
+  // `logged` haengt an der Bestaetigung, und daran haengen Serie und Analyse.
   const entry: DayEntry | undefined = s.days[date]
   let filled = 0
   let met = 0
@@ -83,7 +105,7 @@ export function scoreDay(s: AppState, date: string): DayScore {
   }
   const total = defs.length
   const ratio = total ? filled / total : 0
-  return { filled, total, met, ratio, logged: total > 0 && ratio >= 0.6 }
+  return { filled, total, met, ratio, logged: entry?.confirmed === true }
 }
 
 /** Serie erfasster Tage, rueckwaerts. Der heutige Tag bricht sie nicht, solange er laeuft. */
@@ -102,8 +124,8 @@ export function streak(s: AppState, from = today()): number {
 export function checkStreak(s: AppState, def: CheckDef, from = today()): number {
   let n = 0
   let cursor = from
-  if (!meetsTarget(def, s.days[cursor]?.values[def.id])) cursor = addDays(cursor, -1)
-  while (meetsTarget(def, s.days[cursor]?.values[def.id])) {
+  if (!meetsTarget(def, countedValues(s, cursor)[def.id])) cursor = addDays(cursor, -1)
+  while (meetsTarget(def, countedValues(s, cursor)[def.id])) {
     n++
     cursor = addDays(cursor, -1)
   }
@@ -122,8 +144,8 @@ export function goalMomentum(s: AppState, goalId: string, days = 30): { hits: nu
   const defs = activeChecks(s).filter((c) => c.goals?.includes(goalId))
   let hits = 0
   for (let i = 0; i < days; i++) {
-    const date = addDays(today(), -i)
-    for (const d of defs) if (meetsTarget(d, s.days[date]?.values[d.id])) hits++
+    const values = countedValues(s, addDays(today(), -i))
+    for (const d of defs) if (meetsTarget(d, values[d.id])) hits++
   }
   return { hits, possible: defs.length * days }
 }

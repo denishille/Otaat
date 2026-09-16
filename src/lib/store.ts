@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 5
+const STATE_VERSION = 6
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
@@ -124,6 +124,21 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) >= STATE_VERSION) return s
 
   const byId = new Map(s.checks.map((c) => [c.id, c]))
+
+  // Tage aus der Zeit vor dem Bestaetigen-Knopf: was damals eingetragen
+  // wurde, galt als erfasst und bleibt es. Tage, in denen nur gemessene
+  // Werte stehen — die 180 Tage Kalorien aus dem Abgleich — werden nicht
+  // nachtraeglich zu bestaetigten Tagen, sonst entstuende eine Serie, die es
+  // nie gab.
+  const externalIds = new Set(DEFAULT_CHECKS.filter((c) => c.kind === 'external').map((c) => c.id))
+  for (const day of Object.values(s.days)) {
+    if (day.confirmed === undefined) {
+      day.confirmed = Object.entries(day.values).some(
+        ([id, v]) => !externalIds.has(id) && v !== undefined && v !== null && v !== '',
+      )
+      if (day.confirmed) day.paid = true
+    }
+  }
 
   for (const day of Object.values(s.days)) {
     // Sport war eine Einfachauswahl und ist jetzt eine Mehrfachauswahl;

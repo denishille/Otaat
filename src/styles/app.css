@@ -497,6 +497,23 @@ h2.section-title {
 .daysum-v { font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: -.02em; line-height: 1.15; margin-top: 3px; }
 .daysum-v small { font-family: var(--sans); font-size: 13px; color: var(--ink-3); font-weight: 500; }
 
+/* Tagesabschluss */
+.confirm {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin-top: 20px; padding: 16px 20px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.confirm-text { flex: 1 1 260px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.confirm-text b { color: var(--ink); font-weight: 600; }
+.confirm .btn--primary { flex-shrink: 0; }
+
+.confirm--done {
+  border-style: dashed; border-color: var(--good);
+  background: var(--good-wash); box-shadow: none;
+}
+.confirm--done .confirm-text b { color: var(--good); }
+
 /* Zusammenhaenge */
 .insights { margin-bottom: 28px; }
 
@@ -735,6 +752,23 @@ h2.section-title {
 .daysum-k { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); }
 .daysum-v { font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: -.02em; line-height: 1.15; margin-top: 3px; }
 .daysum-v small { font-family: var(--sans); font-size: 13px; color: var(--ink-3); font-weight: 500; }
+
+/* Tagesabschluss */
+.confirm {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin-top: 20px; padding: 16px 20px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.confirm-text { flex: 1 1 260px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.confirm-text b { color: var(--ink); font-weight: 600; }
+.confirm .btn--primary { flex-shrink: 0; }
+
+.confirm--done {
+  border-style: dashed; border-color: var(--good);
+  background: var(--good-wash); box-shadow: none;
+}
+.confirm--done .confirm-text b { color: var(--good); }
 
 /* Zusammenhaenge */
 .insights { margin-bottom: 28px; }

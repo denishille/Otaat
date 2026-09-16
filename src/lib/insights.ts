@@ -1,6 +1,6 @@
 import type { AppState, CheckDef, CheckValue } from './types'
 import { addDays, today } from './dates'
-import { activeChecks, scoreDay } from './scoring'
+import { activeChecks, countedValues, scoreDay } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
    Laeuft automatisch, sobald genug Tage erfasst sind, und sucht Paare, die
@@ -91,7 +91,7 @@ export function findInsights(s: AppState, window = WINDOW): Insight[] {
 
   // Werte einmal vorrechnen statt in jeder Paarung neu
   const series = new Map<string, (number | null)[]>()
-  for (const d of defs) series.set(d.id, dates.map((date) => numeric(d, s.days[date]?.values[d.id])))
+  for (const d of defs) series.set(d.id, dates.map((date) => numeric(d, countedValues(s, date)[d.id])))
 
   const out: Insight[] = []
 

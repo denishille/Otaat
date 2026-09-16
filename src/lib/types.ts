@@ -38,7 +38,15 @@ export interface DayEntry {
   date: string            // YYYY-MM-DD
   values: Record<ID, CheckValue>
   note?: string
-  /** Checks, fuer die an diesem Tag schon XP vergeben wurde — verhindert Farmen durch An/Aus. */
+  /**
+   * Erst ein bestaetigter Tag zaehlt. Vorher stehen die Werte zwar im Feld
+   * — uebernommen vom letzten Mal —, sind aber nur ein Vorschlag und gehen
+   * nicht in Serie, Statistik oder Zusammenhaenge ein.
+   */
+  confirmed?: boolean
+  /** XP fuer diesen Tag wurde vergeben. Verhindert Nachzahlen beim erneuten Bestaetigen. */
+  paid?: boolean
+  /** @deprecated XP haengt jetzt am bestaetigten Tag, nicht am einzelnen Check. */
   awarded?: ID[]
 }
 

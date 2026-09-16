@@ -30,7 +30,7 @@ schlägt bei Typfehlern fehl.
 | Pfad | Inhalt |
 |---|---|
 | `src/lib/store.ts` | Einziger Schreibweg in den State. `update()` klont, mutiert, persistiert. `transient` für Drags, `commit()` schreibt durch. |
-| `src/lib/scoring.ts` | Zielwerte, Serien, Momentum der Board-Ziele |
+| `src/lib/scoring.ts` | Zielwerte, Serien, Momentum der Board-Ziele. **`countedValues()` ist die Wahrheit**: ein Tag zählt erst als bestätigt, vorher sind die vom Vortag übernommenen Werte nur ein Vorschlag. Gemessene Rubriken (`kind: 'external'`) zählen immer. Statistik, Zusammenhänge und Serien lesen ausschließlich darüber. |
 | `src/data/catalog.ts` | Das Regal — Vorlagen für Future Me Problems |
 | `src/styles/tokens.css` | Alle Farben. Dark Mode ist eine Umdefinition derselben Variablen. |
 | `supabase/migrations/` | Schema, Indizes, RLS |

@@ -23,6 +23,7 @@ export function Today() {
   const defs = activeChecks(state)
   const entry = state.days[date]
   const score = scoreDay(state, date)
+  const confirmed = state.days[date]?.confirmed === true
   const run = streak(state)
   const goals = state.nodes.filter((n) => n.isGoal)
   const carried = useMemo(() => carriedDefaults(state, date), [state, date])
@@ -49,7 +50,7 @@ export function Today() {
 
       update((d) => {
         for (const row of rows) {
-          const day = (d.days[row.date] ??= { date: row.date, values: {}, awarded: [] })
+          const day = (d.days[row.date] ??= { date: row.date, values: {} })
           if (day.values[def.id] !== row.kcal) day.values[def.id] = row.kcal
         }
       })
@@ -70,7 +71,7 @@ export function Today() {
     const missing = Object.entries(carried).filter(([id]) => !isFilled(state.days[date]?.values[id]))
     if (!missing.length) return
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {}, awarded: [] })
+      const day = (d.days[date] ??= { date, values: {} })
       for (const [id, v] of missing) if (!isFilled(day.values[id])) day.values[id] = v
     })
   }, [date, carried, state.days])
@@ -78,28 +79,41 @@ export function Today() {
   const isToday = date === today()
 
   function setValue(def: CheckDef, value: CheckValue) {
-    const wasFilled = isFilled(entry?.values[def.id])
-    const nowFilled = isFilled(value)
-
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {}, awarded: [] })
+      const day = (d.days[date] ??= { date, values: {} })
       if (value === null) delete day.values[def.id]
       else day.values[def.id] = value
+    })
+  }
 
-      if (nowFilled && !(day.awarded ?? []).includes(def.id)) {
-        day.awarded = [...(day.awarded ?? []), def.id]
-        d.meta.xp += XP_PER_CHECK
-        if (def.goals?.length && meetsTarget(def, value)) d.meta.xp += XP_GOAL_PAYOFF * def.goals.length
+  /**
+   * Der Tag wird festgeschrieben. Erst jetzt zaehlt er fuer Serie, Statistik
+   * und Zusammenhaenge — vorher stehen die Werte nur im Formular.
+   */
+  function confirmDay() {
+    const sc = scoreDay(state, date)
+    update((d) => {
+      const day = (d.days[date] ??= { date, values: {} })
+      day.confirmed = true
+      if (day.paid) return
+      day.paid = true
+
+      let xp = sc.filled * XP_PER_CHECK
+      if (sc.total > 0 && sc.filled === sc.total) xp += XP_DAY_COMPLETE
+      for (const def of defs) {
+        if (def.goals?.length && meetsTarget(def, day.values[def.id])) {
+          xp += XP_GOAL_PAYOFF * def.goals.length
+        }
       }
+      d.meta.xp += xp
     })
 
-    if (nowFilled && !wasFilled) {
-      const after = scoreDay({ ...state, days: { ...state.days, [date]: { date, values: { ...(entry?.values ?? {}), [def.id]: value } } } }, date)
-      if (after.filled === after.total && after.total > 0) {
-        update((d) => { d.meta.xp += XP_DAY_COMPLETE })
-        toast('Tag vollständig', XP_DAY_COMPLETE + XP_PER_CHECK)
-      }
-    }
+    const bonus = sc.total > 0 && sc.filled === sc.total
+    toast(bonus ? 'Tag vollständig' : 'Tag bestätigt', sc.filled * XP_PER_CHECK + (bonus ? XP_DAY_COMPLETE : 0))
+  }
+
+  function unconfirmDay() {
+    update((d) => { const day = d.days[date]; if (day) day.confirmed = false })
   }
 
   /**
@@ -257,6 +271,13 @@ export function Today() {
           <Plus /> <span style={{ fontSize: 14, fontWeight: 550 }}>Noch was tracken</span>
         </button>
       </div>
+
+      <ConfirmBar
+        confirmed={confirmed}
+        score={score}
+        onConfirm={confirmDay}
+        onUndo={unconfirmDay}
+      />
 
       {reorder && (
         <div
@@ -526,6 +547,40 @@ function MultiInput({ def, value, onChange, onAddOption, onRemoveOption }: {
 }
 
 /* ---------------------------------------------------------------- */
+
+/** Der Abschluss des Tages. Ohne ihn zaehlt nichts von oben. */
+function ConfirmBar({ confirmed, score, onConfirm, onUndo }: {
+  confirmed: boolean
+  score: { filled: number; total: number }
+  onConfirm: () => void
+  onUndo: () => void
+}) {
+  if (confirmed) {
+    return (
+      <div className="confirm confirm--done">
+        <span className="confirm-text">
+          <b>Tag bestätigt.</b> Er zählt in Serie, Statistik und Zusammenhänge.
+        </span>
+        <button className="btn btn--quiet btn--sm" onClick={onUndo}>Wieder öffnen</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="confirm">
+      <span className="confirm-text">
+        {score.filled === 0
+          ? 'Noch nichts eingetragen.'
+          : score.filled === score.total
+            ? <><b>Alles ausgefüllt.</b> Bestätigen, damit der Tag zählt.</>
+            : <><b>{score.filled} von {score.total}</b> ausgefüllt. Was vom letzten Mal steht, ist nur ein Vorschlag.</>}
+      </span>
+      <button className="btn btn--primary" onClick={onConfirm} disabled={score.filled === 0}>
+        <Check /> Tag bestätigen
+      </button>
+    </div>
+  )
+}
 
 /**
  * Zusammenhaenge zwischen den Checks. Laeuft von allein, sobald genug Tage
