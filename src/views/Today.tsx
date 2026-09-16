@@ -149,6 +149,7 @@ export function Today() {
     <>
       <div className="today-head">
         <div>
+          <div className="eyebrow">Everything Checker</div>
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
