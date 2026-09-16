@@ -6,7 +6,7 @@ import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scor
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
-import { ChevL, ChevR, Grip, Plus, Trash } from '../components/Icons'
+import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { CheckStats } from './CheckStats'
@@ -68,6 +68,30 @@ export function Today() {
         toast('Tag vollständig', XP_DAY_COMPLETE + XP_PER_CHECK)
       }
     }
+  }
+
+  /**
+   * Option abschaffen: sie wird nicht mehr angeboten und verschwindet aus dem
+   * heutigen Eintrag. Bereits erfasste Tage behalten ihren Wert — die Karte
+   * zeigt ihn dort weiter an, damit Entfernen nicht rueckwirkend Daten
+   * verschluckt.
+   */
+  function removeOption(def: CheckDef, option: string) {
+    update((d) => {
+      const c = d.checks.find((x) => x.id === def.id)
+      if (c) {
+        c.options = (c.options ?? []).filter((o) => o !== option)
+        if (c.noneOption === option) c.noneOption = undefined
+      }
+      const day = d.days[date]
+      const v = day?.values[def.id]
+      if (Array.isArray(v)) {
+        const next = v.filter((o) => o !== option)
+        if (next.length) day.values[def.id] = next
+        else delete day.values[def.id]
+      }
+    })
+    toast(`„${option}" entfernt`)
   }
 
   /* ---- Reihenfolge per Griff ---- */
@@ -189,6 +213,7 @@ export function Today() {
             onChange={(v) => setValue(def, v)}
             onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
+            onRemoveOption={(o) => removeOption(def, o)}
           />
         ))}
 
@@ -243,9 +268,10 @@ interface CardProps {
   onChange: (v: CheckValue) => void
   onOpen: () => void
   onAddOption: (option: string) => void
+  onRemoveOption: (option: string) => void
 }
 
-function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption }: CardProps) {
+function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption }: CardProps) {
   const filled = isFilled(value)
 
   return (
@@ -262,7 +288,7 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} />
+      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} onRemoveOption={onRemoveOption} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -279,11 +305,12 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
   )
 }
 
-function Input({ def, value, onChange, onAddOption }: {
+function Input({ def, value, onChange, onAddOption, onRemoveOption }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
   onAddOption: (option: string) => void
+  onRemoveOption: (option: string) => void
 }) {
   switch (def.kind) {
     case 'bool':
@@ -326,7 +353,7 @@ function Input({ def, value, onChange, onAddOption }: {
         </div>
       )
     case 'multi':
-      return <MultiInput def={def} value={value} onChange={onChange} onAddOption={onAddOption} />
+      return <MultiInput def={def} value={value} onChange={onChange} onAddOption={onAddOption} onRemoveOption={onRemoveOption} />
     case 'text':
       return (
         <textarea
@@ -338,15 +365,22 @@ function Input({ def, value, onChange, onAddOption }: {
   }
 }
 
-function MultiInput({ def, value, onChange, onAddOption }: {
+function MultiInput({ def, value, onChange, onAddOption, onRemoveOption }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
   onAddOption: (option: string) => void
+  onRemoveOption: (option: string) => void
 }) {
   const [adding, setAdding] = useState(false)
+  const [managing, setManaging] = useState(false)
   const [draft, setDraft] = useState('')
   const picked = Array.isArray(value) ? value : []
+
+  // Ein Wert, der an diesem Tag steht, aber nicht mehr angeboten wird, bleibt
+  // sichtbar — sonst verschwaende das Entfernen einer Option rueckwirkend
+  // erfasste Tage.
+  const options = [...(def.options ?? []), ...picked.filter((p) => !def.options?.includes(p))]
 
   const toggle = (o: string) => {
     // "Nix" und tatsaechlich gemachter Sport schliessen sich gegenseitig aus
@@ -370,17 +404,30 @@ function MultiInput({ def, value, onChange, onAddOption }: {
   }
 
   return (
-    <div className="multi">
-      {(def.options ?? []).map((o) => (
-        <button
-          key={o}
-          className={o === def.noneOption ? 'none' : undefined}
-          aria-pressed={picked.includes(o)}
-          onClick={() => toggle(o)}
-        >
-          {o}
-        </button>
+    <div className={'multi' + (managing ? ' multi--managing' : '')}>
+      {options.map((o) => (
+        <span className="multi-slot" key={o}>
+          <button
+            className={o === def.noneOption ? 'none' : undefined}
+            aria-pressed={picked.includes(o)}
+            disabled={managing}
+            onClick={() => toggle(o)}
+          >
+            {o}
+          </button>
+          {managing && (
+            <button
+              className="multi-x"
+              onClick={() => onRemoveOption(o)}
+              aria-label={`${o} entfernen`}
+              title={`${o} entfernen`}
+            >
+              <X />
+            </button>
+          )}
+        </span>
       ))}
+
       {adding ? (
         <input
           autoFocus value={draft}
@@ -393,9 +440,26 @@ function MultiInput({ def, value, onChange, onAddOption }: {
           }}
         />
       ) : (
-        <button className="addopt" onClick={() => setAdding(true)} aria-label="Eigene Option hinzufügen">
-          <Plus />
-        </button>
+        <>
+          <button
+            className="addopt"
+            onClick={() => { setManaging(false); setAdding(true) }}
+            aria-label="Option hinzufügen"
+            title="Option hinzufügen"
+          >
+            <Plus />
+          </button>
+          {options.length > 0 && (
+            <button
+              className={'addopt' + (managing ? ' addopt--on' : '')}
+              onClick={() => setManaging((m) => !m)}
+              aria-label={managing ? 'Fertig' : 'Optionen entfernen'}
+              title={managing ? 'Fertig' : 'Optionen entfernen'}
+            >
+              {managing ? <Check /> : <Pencil />}
+            </button>
+          )}
+        </>
       )}
     </div>
   )

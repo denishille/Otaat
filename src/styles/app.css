@@ -409,6 +409,33 @@ h2.section-title {
   border-style: dashed; color: var(--ink-4);
 }
 .multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
+.multi .addopt--on {
+  background: var(--ink); border-color: var(--ink); border-style: solid;
+  color: var(--paper);
+}
+.multi .addopt--on:hover { color: var(--paper); border-color: var(--ink); }
+
+/* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
+   sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
+.multi-slot { position: relative; display: inline-flex; }
+.multi--managing .multi-slot > button:not(.multi-x) { opacity: .7; }
+.multi--managing .multi-slot > button[disabled] { pointer-events: none; }
+
+/* `.multi .multi-x` statt `.multi-x`: sonst gewinnt `.multi button` mit
+   seiner hoeheren Spezifitaet und der Kreis bleibt ein Oval. */
+.multi .multi-x {
+  position: absolute; top: -5px; right: -5px;
+  /* Padding und Rahmen der Options-Chips zuruecknehmen, sonst wird aus dem
+     Kreis ein Oval. */
+  width: 17px; height: 17px; min-width: 0; padding: 0; border: 0;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--signal); color: #fff;
+  font-size: 10px; line-height: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+  transition: transform .12s;
+}
+.multi .multi-x:hover { transform: scale(1.15); }
 .multi input {
   width: 108px; padding: 5px 10px; border-radius: var(--r-pill);
   border: 1px solid var(--cobalt); background: var(--surface);
@@ -596,6 +623,33 @@ h2.section-title {
   border-style: dashed; color: var(--ink-4);
 }
 .multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
+.multi .addopt--on {
+  background: var(--ink); border-color: var(--ink); border-style: solid;
+  color: var(--paper);
+}
+.multi .addopt--on:hover { color: var(--paper); border-color: var(--ink); }
+
+/* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
+   sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
+.multi-slot { position: relative; display: inline-flex; }
+.multi--managing .multi-slot > button:not(.multi-x) { opacity: .7; }
+.multi--managing .multi-slot > button[disabled] { pointer-events: none; }
+
+/* `.multi .multi-x` statt `.multi-x`: sonst gewinnt `.multi button` mit
+   seiner hoeheren Spezifitaet und der Kreis bleibt ein Oval. */
+.multi .multi-x {
+  position: absolute; top: -5px; right: -5px;
+  /* Padding und Rahmen der Options-Chips zuruecknehmen, sonst wird aus dem
+     Kreis ein Oval. */
+  width: 17px; height: 17px; min-width: 0; padding: 0; border: 0;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--signal); color: #fff;
+  font-size: 10px; line-height: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+  transition: transform .12s;
+}
+.multi .multi-x:hover { transform: scale(1.15); }
 .multi input {
   width: 108px; padding: 5px 10px; border-radius: var(--r-pill);
   border: 1px solid var(--cobalt); background: var(--surface);
