@@ -3,6 +3,7 @@ import { useStore, update, uid, commit } from '../lib/store'
 import type { BoardFrame, BoardNode, NodeColor } from '../lib/types'
 import { goalMomentum } from '../lib/scoring'
 import { Link, Plus, Trash } from '../components/Icons'
+import { isTouch } from '../lib/device'
 
 const COLORS: NodeColor[] = ['slate', 'cobalt', 'signal', 'moss', 'plum', 'amber']
 const NODE_W = 208
@@ -400,7 +401,6 @@ export function Board() {
   }
 
   const selNode = sel?.kind === 'node' ? nodes.find((n) => n.id === sel.id) : undefined
-  const touchLike = typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches
 
   return (
     <div className={'board-wrap' + (drag?.kind === 'pan' ? ' panning' : '')} ref={wrapRef}>
@@ -517,7 +517,7 @@ export function Board() {
         <div className="board-hint">
           {nodes.length === 0
             ? 'Irgendwo hinklicken und losschreiben'
-            : touchLike
+            : isTouch
               ? 'Tippen = neu · einen auf den anderen ziehen = verbinden · zwei Finger = zoomen'
               : 'Klick = neu · einen auf den anderen ziehen = verbinden · ⌘/Strg + Scroll = Zoom'}
         </div>

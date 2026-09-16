@@ -7,6 +7,7 @@ import { XP_REMINDER_DONE } from '../lib/xp'
 import { downloadICS } from '../lib/ics'
 import { Cal, Check, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
+import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
 
 type Filter = { kind: 'radar' } | { kind: 'all' } | { kind: 'cat'; name: string }
@@ -239,7 +240,12 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <input className="input" placeholder="Suchen — Zahnarzt, TÜV, Semesterbeitrag …" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      <input
+        className="input" type="search"
+        placeholder="Suchen — Zahnarzt, TÜV, Semesterbeitrag …"
+        value={q} onChange={(e) => setQ(e.target.value)}
+        autoFocus={autoFocusUnlessTouch} {...noAutofill}
+      />
 
       {groups.map((g) => (
         <section key={g.category}>
@@ -351,7 +357,12 @@ function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onCl
     >
       <div className="field">
         <label htmlFor="r-title">Was</label>
-        <input id="r-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="z.B. Semesterbeitrag überweisen" autoFocus />
+        <input
+          id="r-title" name="reminder-title" className="input"
+          value={title} onChange={(e) => setTitle(e.target.value)}
+          placeholder="z.B. Semesterbeitrag überweisen"
+          autoFocus={autoFocusUnlessTouch} {...noAutofill}
+        />
       </div>
 
       <div className="field">

@@ -8,6 +8,7 @@ import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
 import { ChevL, ChevR, Grip, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
+import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { CheckStats } from './CheckStats'
 import { toast } from '../components/Toasts'
 
@@ -383,7 +384,7 @@ function MultiInput({ def, value, onChange, onAddOption }: {
       {adding ? (
         <input
           autoFocus value={draft}
-          placeholder="Sportart"
+          placeholder="Sportart" {...noAutofill}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -534,8 +535,13 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
       }
     >
       <div className="field">
-        <label htmlFor="ce-name">Name</label>
-        <input id="ce-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="z.B. Kaltduschen" autoFocus />
+        <label htmlFor="ce-label">Name</label>
+        <input
+          id="ce-label" name="check-label" className="input"
+          value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="z.B. Kaltduschen"
+          autoFocus={autoFocusUnlessTouch} {...noAutofill}
+        />
       </div>
 
       <div className="field">
