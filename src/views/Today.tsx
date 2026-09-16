@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
-import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scoreDay, streak } from '../lib/scoring'
+import { activeChecks, carriedDefaults, isFilled, meetsTarget, scoreDay, streak } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
@@ -241,7 +241,6 @@ export function Today() {
             def={def}
             value={entry?.values[def.id] ?? null}
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
-            streak={checkStreak(state, def, date)}
             onChange={(v) => setValue(def, v)}
             onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
@@ -294,7 +293,6 @@ interface CardProps {
   def: CheckDef
   value: CheckValue
   goalNames: { text: string; color: string }[]
-  streak: number
   cardRef: (el: HTMLDivElement | null) => void
   dragging: boolean
   onGrip: (e: React.PointerEvent) => void
@@ -306,7 +304,7 @@ interface CardProps {
   externalState?: 'idle' | 'laden' | 'fehler'
 }
 
-function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
   const filled = isFilled(value)
 
   return (
@@ -317,7 +315,6 @@ function CheckCard({ def, value, goalNames, streak: s, cardRef, dragging, onGrip
       <div className="check-top">
         <button onClick={onOpen} className="check-name" style={{ textAlign: 'left' }} title="Statistik ansehen">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
           {def.unit && <span className="check-unit">{def.unit}</span>}
           <button className="grip" onPointerDown={onGrip} aria-label="Verschieben" title="Verschieben"><Grip /></button>
         </div>
