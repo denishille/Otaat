@@ -41,6 +41,8 @@ export function Board() {
   const [gliding, setGliding] = useState(false)
   const [hotFrame, setHotFrame] = useState<string | null>(null)
   const [indexOpen, setIndexOpen] = useState(!isTouch)
+  const indexRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
 
   /** Alle Finger, die gerade auf dem Board liegen. */
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -384,13 +386,26 @@ export function Board() {
    * Links bleibt Platz fuer das Verzeichnis, unten fuer die Werkzeugleiste —
    * sonst landet genau das, was man anspringt, hinter einem Bedienelement.
    */
-  function glideTo(x: number, y: number, w: number, h: number, opts?: { instant?: boolean }) {
+  function glideTo(
+    x: number, y: number, w: number, h: number,
+    opts?: { instant?: boolean; ignoreIndex?: boolean },
+  ) {
     const pad = 64
     const r = wrapRef.current!.getBoundingClientRect()
     if (w <= 0 || h <= 0) return
 
-    const left = indexOpen ? 252 : pad
-    const bottom = 92
+    // Die Bedienelemente werden gemessen, nicht geschaetzt. Und es wird nur
+    // ausgewichen, solange danach noch eine brauchbare Flaeche uebrig bleibt:
+    // auf dem Handy deckt das Verzeichnis die halbe Breite ab, dort wuerde
+    // ein fester Abstand den Bereich auf einen Streifen am Rand quetschen.
+    let left = pad
+    const ip = opts?.ignoreIndex ? null : indexRef.current?.getBoundingClientRect()
+    if (ip && ip.width > 0 && r.width - ip.width - pad * 2 >= 280) left = ip.right - r.left + 20
+
+    let bottom = pad
+    const tb = toolbarRef.current?.getBoundingClientRect()
+    if (tb && tb.height > 0 && r.height - tb.height - pad * 2 >= 240) bottom = r.bottom - tb.top + 16
+
     const availW = Math.max(120, r.width - left - pad)
     const availH = Math.max(120, r.height - pad - bottom)
 
@@ -488,7 +503,11 @@ export function Board() {
 
           {frames.map((f) => (
             <div key={f.id} className={'frame' + (sel?.kind === 'frame' && sel.id === f.id ? ' frame--sel' : '') + (hotFrame === f.id ? ' frame--hot' : '')}
-              style={{ left: f.x, top: f.y, width: f.w, height: f.h, borderColor: sel?.kind === 'frame' && sel.id === f.id ? undefined : `var(--n-${f.color})`, opacity: f.color === 'slate' ? 1 : 0.9 }}
+              style={{
+                left: f.x, top: f.y, width: f.w, height: f.h,
+                // Der Rahmen faerbt sich im Stylesheet aus diesem Wert.
+                ['--n' as string]: `var(--n-${f.color})`,
+              }}
               onPointerDown={(e) => onFrameDown(e, f)}>
               <div className="frame-label" contentEditable suppressContentEditableWarning
                 onPointerDown={(e) => e.stopPropagation()}
@@ -597,7 +616,7 @@ export function Board() {
         {nodes.length === 0 && frames.length === 0 ? (
           <div className="board-hint">Irgendwo hinklicken und losschreiben</div>
         ) : (
-          <div className={'board-index' + (indexOpen ? '' : ' board-index--shut')}>
+          <div className={'board-index' + (indexOpen ? '' : ' board-index--shut')} ref={indexRef}>
             <button className="board-index-head" onClick={() => setIndexOpen((o) => !o)}>
               <span>Bereiche</span>
               <span className="mono">{frames.length}</span>
@@ -612,7 +631,13 @@ export function Board() {
                     <button
                       key={f.id}
                       className="board-index-row"
-                      onClick={() => { glideTo(f.x, f.y, f.w, f.h); setSel({ kind: 'frame', id: f.id }) }}
+                      onClick={() => {
+                        // Ohne Maus ist das Verzeichnis ein Vorhang vor dem
+                        // Board — es geht zu, sobald man ein Ziel gewaehlt hat.
+                        if (isTouch) setIndexOpen(false)
+                        glideTo(f.x, f.y, f.w, f.h, { ignoreIndex: isTouch })
+                        setSel({ kind: 'frame', id: f.id })
+                      }}
                       onMouseEnter={() => setHotFrame(f.id)}
                       onMouseLeave={() => setHotFrame(null)}
                     >
@@ -638,7 +663,8 @@ export function Board() {
                       const y0 = Math.min(...looseNodes.map((n) => n.y))
                       const x1 = Math.max(...looseNodes.map((n) => n.x + n.w))
                       const y1 = Math.max(...looseNodes.map((n) => n.y + (sizes[n.id]?.h ?? 48)))
-                      glideTo(x0, y0, x1 - x0, y1 - y0)
+                      if (isTouch) setIndexOpen(false)
+                      glideTo(x0, y0, x1 - x0, y1 - y0, { ignoreIndex: isTouch })
                     }}
                   >
                     <i className="board-index-dot board-index-dot--none" />
@@ -649,7 +675,11 @@ export function Board() {
 
                 <button
                   className="board-index-row board-index-row--all"
-                  onClick={() => { const e = everything(); if (e) glideTo(e.x, e.y, e.w, e.h) }}
+                  onClick={() => {
+                    if (isTouch) setIndexOpen(false)
+                    const e = everything()
+                    if (e) glideTo(e.x, e.y, e.w, e.h, { ignoreIndex: isTouch })
+                  }}
                 >
                   Alles zeigen
                 </button>
@@ -659,7 +689,7 @@ export function Board() {
         )}
       </div>
 
-      <div className="board-toolbar">
+      <div className="board-toolbar" ref={toolbarRef}>
         <button className="btn btn--quiet btn--sm" onClick={() => {
           const r = wrapRef.current!.getBoundingClientRect()
           const c = toWorld(r.left + r.width / 2, r.top + r.height / 2)

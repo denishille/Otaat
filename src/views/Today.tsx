@@ -52,11 +52,6 @@ export function Today() {
           const day = (d.days[row.date] ??= { date: row.date, values: {}, awarded: [] })
           if (day.values[def.id] !== row.kcal) day.values[def.id] = row.kcal
         }
-        // Das Tagesziel kommt aus derselben Quelle — sonst bewertet OTAAT
-        // gegen eine Zahl, die dort laengst geaendert wurde.
-        const latest = [...rows].reverse().find((r) => r.target !== null)
-        const c = d.checks.find((x) => x.id === def.id)
-        if (c && latest?.target != null && c.target !== latest.target) c.target = latest.target
       })
     })
     return () => ctrl.abort()
@@ -415,7 +410,6 @@ function ExternalValue({ def, value, state }: {
   state?: 'idle' | 'laden' | 'fehler'
 }) {
   const n = typeof value === 'number' ? value : null
-  const target = def.target
 
   if (n === null) {
     return (
@@ -425,20 +419,12 @@ function ExternalValue({ def, value, state }: {
     )
   }
 
-  const over = target !== undefined && n > target
-  const pct = target ? Math.min(100, (n / target) * 100) : 0
-
   return (
     <div className="ext">
       <div className="ext-row">
-        <span className="ext-value">{Math.round(n)}</span>
-        {target !== undefined && <span className="ext-target">/ {Math.round(target)}</span>}
+        <span className="ext-value">{Math.round(n).toLocaleString('de-DE')}</span>
+        {def.unit && <span className="ext-target">{def.unit}</span>}
       </div>
-      {target !== undefined && (
-        <div className="ext-bar">
-          <i className={over ? 'ext-bar--over' : undefined} style={{ width: `${pct}%` }} />
-        </div>
-      )}
       <div className="ext-note">aus Kalorienbrudi</div>
     </div>
   )
@@ -528,16 +514,14 @@ function MultiInput({ def, value, onChange, onAddOption, onRemoveOption }: {
           >
             <Plus />
           </button>
-          {options.length > 0 && (
-            <button
-              className={'addopt' + (managing ? ' addopt--on' : '')}
-              onClick={() => setManaging((m) => !m)}
-              aria-label={managing ? 'Fertig' : 'Optionen entfernen'}
-              title={managing ? 'Fertig' : 'Optionen entfernen'}
-            >
-              {managing ? <Check /> : <Pencil />}
-            </button>
-          )}
+          <button
+            className={'editopt' + (managing ? ' editopt--on' : '')}
+            onClick={() => setManaging((m) => !m)}
+            aria-label={managing ? 'Fertig' : 'Optionen bearbeiten'}
+            title={managing ? 'Fertig' : 'Optionen bearbeiten'}
+          >
+            {managing ? <Check /> : <Pencil />}
+          </button>
         </>
       )}
     </div>

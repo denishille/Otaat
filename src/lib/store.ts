@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 4
+const STATE_VERSION = 5
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),

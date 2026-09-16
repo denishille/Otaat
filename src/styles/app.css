@@ -397,14 +397,11 @@ h2.section-title {
 .ext { display: flex; flex-direction: column; gap: 7px; }
 .ext-row { display: flex; align-items: baseline; gap: 6px; }
 .ext-value {
-  font-family: var(--display); font-weight: 600; font-size: 27px;
+  font-family: var(--display); font-weight: 600; font-size: 31px;
   letter-spacing: -.02em; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .ext-target { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
-.ext-bar { height: 5px; border-radius: 3px; background: var(--paper-sunk); overflow: hidden; }
-.ext-bar i { display: block; height: 100%; border-radius: 3px; background: var(--cobalt); }
-.ext-bar i.ext-bar--over { background: var(--signal); }
 .ext-note {
   font-family: var(--mono); font-size: 10px; color: var(--ink-4);
   text-transform: uppercase; letter-spacing: .09em;
@@ -430,11 +427,18 @@ h2.section-title {
   border-style: dashed; color: var(--ink-4);
 }
 .multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
-.multi .addopt--on {
-  background: var(--ink); border-color: var(--ink); border-style: solid;
-  color: var(--paper);
+/* Das Plus legt an, der Stift raeumt auf — zwei gleich aussehende
+   gestrichelte Kreise waren nicht auseinanderzuhalten. */
+.multi .editopt {
+  width: 28px; padding: 0; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill);
+  background: var(--paper-sunk); color: var(--ink-3);
 }
-.multi .addopt--on:hover { color: var(--paper); border-color: var(--ink); }
+.multi .editopt:hover { color: var(--ink); border-color: var(--ink-3); }
+.multi .editopt--on {
+  background: var(--ink); border-color: var(--ink); color: var(--paper);
+}
+.multi .editopt--on:hover { color: var(--paper); border-color: var(--ink); }
 
 /* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
    sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
@@ -632,14 +636,11 @@ h2.section-title {
 .ext { display: flex; flex-direction: column; gap: 7px; }
 .ext-row { display: flex; align-items: baseline; gap: 6px; }
 .ext-value {
-  font-family: var(--display); font-weight: 600; font-size: 27px;
+  font-family: var(--display); font-weight: 600; font-size: 31px;
   letter-spacing: -.02em; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .ext-target { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
-.ext-bar { height: 5px; border-radius: 3px; background: var(--paper-sunk); overflow: hidden; }
-.ext-bar i { display: block; height: 100%; border-radius: 3px; background: var(--cobalt); }
-.ext-bar i.ext-bar--over { background: var(--signal); }
 .ext-note {
   font-family: var(--mono); font-size: 10px; color: var(--ink-4);
   text-transform: uppercase; letter-spacing: .09em;
@@ -665,11 +666,18 @@ h2.section-title {
   border-style: dashed; color: var(--ink-4);
 }
 .multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
-.multi .addopt--on {
-  background: var(--ink); border-color: var(--ink); border-style: solid;
-  color: var(--paper);
+/* Das Plus legt an, der Stift raeumt auf — zwei gleich aussehende
+   gestrichelte Kreise waren nicht auseinanderzuhalten. */
+.multi .editopt {
+  width: 28px; padding: 0; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill);
+  background: var(--paper-sunk); color: var(--ink-3);
 }
-.multi .addopt--on:hover { color: var(--paper); border-color: var(--ink); }
+.multi .editopt:hover { color: var(--ink); border-color: var(--ink-3); }
+.multi .editopt--on {
+  background: var(--ink); border-color: var(--ink); color: var(--paper);
+}
+.multi .editopt--on:hover { color: var(--paper); border-color: var(--ink); }
 
 /* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
    sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
@@ -991,15 +999,20 @@ h2.section-title {
   font-variant-numeric: tabular-nums;
 }
 
+/* Der Bereich ist eine Flaeche, kein Gitter: voller Grund, Rahmen in seiner
+   Farbe. Liegt im DOM vor den Karten, deckt sie also nicht zu. */
 .frame {
   position: absolute; touch-action: none;
-  border: 1.5px dashed var(--line-strong);
-  border-radius: var(--r-lg); background: color-mix(in srgb, var(--surface) 42%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--n, var(--line-strong)) 55%, var(--line-strong));
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(20, 22, 28, .04);
   cursor: grab;
 }
 .frame--sel { border-color: var(--cobalt); border-style: solid; }
 .frame-label {
   position: absolute; top: -12px; left: 14px;
+  z-index: 1;
   padding: 2px 9px; border-radius: var(--r-pill);
   background: var(--surface); border: 1px solid var(--line-strong);
   font-size: 11.5px; font-weight: 600; color: var(--ink-2);
