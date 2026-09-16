@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
@@ -6,7 +6,7 @@ import { activeChecks, carriedDefaults, checkStreak, isFilled, meetsTarget, scor
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
-import { ChevL, ChevR, Plus, Trash } from '../components/Icons'
+import { ChevL, ChevR, Mark, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toasts'
 
@@ -22,7 +22,23 @@ export function Today() {
   const run = streak(state)
   const goals = state.nodes.filter((n) => n.isGoal)
   const carried = useMemo(() => carriedDefaults(state, date), [state, date])
-  const openCarried = defs.filter((d) => !isFilled(entry?.values[d.id]) && isFilled(carried[d.id]))
+
+  /**
+   * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,
+   * nicht als Vorschlag. Nur fuer heute: aeltere Tage rueckwirkend zu fuellen
+   * wuerde Daten erfinden, die es nie gab.
+   * XP gibt es dafuer keine; die haengt weiter daran, dass man selbst etwas
+   * anfasst (`awarded` bleibt leer).
+   */
+  useEffect(() => {
+    if (date !== today()) return
+    const missing = Object.entries(carried).filter(([id]) => !isFilled(state.days[date]?.values[id]))
+    if (!missing.length) return
+    update((d) => {
+      const day = (d.days[date] ??= { date, values: {}, awarded: [] })
+      for (const [id, v] of missing) if (!isFilled(day.values[id])) day.values[id] = v
+    })
+  }, [date, carried, state.days])
 
   const isToday = date === today()
 
@@ -61,15 +77,16 @@ export function Today() {
     })
   }
 
-  function takeAllCarried() {
-    for (const def of openCarried) setValue(def, carried[def.id])
-  }
-
   return (
     <>
       <div className="today-head">
         <div>
-          <div className="eyebrow">Everything Checker</div>
+          <div className="wordmark">
+            <Mark />
+            <span>
+              <i>O</i>ne <i>T</i>hing <i>A</i>t <i>A</i> <i>T</i>ime
+            </span>
+          </div>
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
@@ -93,14 +110,6 @@ export function Today() {
 
       <Insights state={state} />
 
-      {openCarried.length > 0 && (
-        <div className="insights-progress" style={{ marginBottom: 20 }}>
-          <span style={{ flex: 1 }}>
-            {openCarried.length} {openCarried.length === 1 ? 'Feld steht' : 'Felder stehen'} auf dem Wert vom letzten Mal.
-          </span>
-          <button className="btn btn--primary btn--sm" onClick={() => takeAllCarried()}>Alle übernehmen</button>
-        </div>
-      )}
 
       <div className="check-grid">
         {defs.map((def) => (
@@ -108,7 +117,6 @@ export function Today() {
             key={def.id}
             def={def}
             value={entry?.values[def.id] ?? null}
-            suggestion={carried[def.id] ?? null}
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
             streak={checkStreak(state, def, date)}
             onChange={(v) => setValue(def, v)}
@@ -142,8 +150,6 @@ export function Today() {
 interface CardProps {
   def: CheckDef
   value: CheckValue
-  /** Wert vom letzten Mal — wird gezeigt, solange nichts eingetragen ist */
-  suggestion: CheckValue
   goalNames: { text: string; color: string }[]
   streak: number
   onChange: (v: CheckValue) => void
@@ -151,23 +157,20 @@ interface CardProps {
   onAddOption: (option: string) => void
 }
 
-function CheckCard({ def, value, suggestion, goalNames, streak: s, onChange, onEdit, onAddOption }: CardProps) {
+function CheckCard({ def, value, goalNames, streak: s, onChange, onEdit, onAddOption }: CardProps) {
   const filled = isFilled(value)
-  const carried = !filled && isFilled(suggestion)
-  const shown = filled ? value : carried ? suggestion : null
 
   return (
-    <div className={'check' + (filled ? ' check--filled' : '') + (carried ? ' check--carried' : '')}>
+    <div className={'check' + (filled ? ' check--filled' : '')}>
       <div className="check-top">
         <button onClick={onEdit} className="check-name" style={{ textAlign: 'left' }} title="Bearbeiten">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {carried && <span className="carried-hint">wie zuletzt</span>}
-          {!carried && s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
+          {s > 1 && <span className={'streak' + (s >= 7 ? ' streak--hot' : '')}><b>{s}</b>×</span>}
           {def.unit && <span className="check-unit">{def.unit}</span>}
         </div>
       </div>
 
-      <Input def={def} value={shown} onChange={onChange} onAddOption={onAddOption} />
+      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} />
 
       {goalNames.length > 0 && (
         <div className="contrib">

@@ -36,3 +36,24 @@ export const Cal = (p: P) => (
 export const Dots = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" {...p}><circle cx="4" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12" cy="8" r="1.3" /></svg>
 )
+
+/** Die Bildmarke: acht Punkte auf der Kreisbahn, einer gefuellt. */
+export const Mark = ({ className }: P) => {
+  const R = 29
+  const dots = Array.from({ length: 8 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 8
+    return { x: 50 + R * Math.cos(a), y: 50 + R * Math.sin(a), on: i === 1 }
+  })
+  return (
+    <svg viewBox="0 0 100 100" width="1em" height="1em" className={className} aria-hidden="true">
+      <circle cx="50" cy="50" r={R} fill="none" stroke="currentColor" strokeWidth="0.8" opacity=".3" />
+      {dots.map((d, i) =>
+        d.on ? (
+          <circle key={i} cx={d.x} cy={d.y} r="7.1" fill="var(--cobalt)" />
+        ) : (
+          <circle key={i} cx={d.x} cy={d.y} r="5.8" fill="none" stroke="currentColor" strokeWidth="2.4" opacity=".55" />
+        ),
+      )}
+    </svg>
+  )
+}

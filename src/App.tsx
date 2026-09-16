@@ -7,7 +7,7 @@ import { FutureMe } from './views/FutureMe'
 import { Board } from './views/Board'
 import { Sheet } from './components/Sheet'
 import { Toasts, toast } from './components/Toasts'
-import { Moon, Sun } from './components/Icons'
+import { Mark, Moon, Sun } from './components/Icons'
 import { daysBetween, today } from './lib/dates'
 
 type Tab = 'today' | 'future' | 'board'
@@ -54,7 +54,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand" onClick={() => go('today')} role="button" tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && go('today')}>
-          <span className="brand-dot" />
+          <Mark className="brand-mark" />
           <span className="brand-name">OTAAT</span>
         </div>
 

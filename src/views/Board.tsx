@@ -35,17 +35,23 @@ export function Board() {
   const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  /** Alle Finger, die gerade auf dem Board liegen. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  /** Aktiv, sobald zwei Finger drauf sind — hat Vorrang vor jedem Ziehen. */
+  const pinch = useRef<{ dist: number; cx: number; cy: number; view: typeof view } | null>(null)
+  /** Damit der Effekt unten immer den aktuellen Zoom sieht, ohne neu zu binden. */
+  const viewRef = useRef(view)
+  viewRef.current = view
+
   const { nodes, frames, edges } = state
 
   /* ------------------ Koordinaten ------------------ */
 
-  const toWorld = useCallback(
-    (clientX: number, clientY: number) => {
-      const r = wrapRef.current!.getBoundingClientRect()
-      return { x: (clientX - r.left - view.x) / view.z, y: (clientY - r.top - view.y) / view.z }
-    },
-    [view],
-  )
+  const toWorld = useCallback((clientX: number, clientY: number) => {
+    const r = wrapRef.current!.getBoundingClientRect()
+    const v = viewRef.current
+    return { x: (clientX - r.left - v.x) / v.z, y: (clientY - r.top - v.y) / v.z }
+  }, [])
 
   /* ------------------ Groessen messen ------------------ */
 
@@ -108,20 +114,48 @@ export function Board() {
 
   /* ------------------ Pointer ------------------ */
 
+  /**
+   * Meldet einen Finger an. Ab dem zweiten wird gezoomt statt gezogen —
+   * ein angefangenes Ziehen wird dabei abgebrochen, sonst wandert der Knoten
+   * beim Aufziehen mit.
+   */
+  function track(e: React.PointerEvent): boolean {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()]
+      pinch.current = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        cx: (a.x + b.x) / 2,
+        cy: (a.y + b.y) / 2,
+        view: viewRef.current,
+      }
+      setDrag(null)
+      setWire(null)
+    }
+    return pointers.current.size === 1
+  }
+
   function onCanvasDown(e: React.PointerEvent) {
     if (e.button !== 0 && e.button !== 1) return
+    if (!track(e)) return
     setDrag({ kind: 'pan', startX: e.clientX, startY: e.clientY, origin: { x: view.x, y: view.y }, moved: false })
   }
 
   function onNodeDown(e: React.PointerEvent, n: BoardNode) {
     if (editingId === n.id) return
     e.stopPropagation()
+    if (!track(e)) return
+    const already = sel?.kind === 'node' && sel.id === n.id
     setSel({ kind: 'node', id: n.id })
-    setDrag({ kind: 'node', id: n.id, startX: e.clientX, startY: e.clientY, origin: { x: n.x, y: n.y }, moved: false })
+    setDrag({
+      kind: 'node', id: n.id, startX: e.clientX, startY: e.clientY,
+      origin: { x: n.x, y: n.y }, wasSelected: already, moved: false,
+    })
   }
 
   function onFrameDown(e: React.PointerEvent, f: BoardFrame) {
     e.stopPropagation()
+    if (!track(e)) return
     setSel({ kind: 'frame', id: f.id })
     const carried = nodes
       .filter((n) => {
@@ -141,21 +175,64 @@ export function Board() {
 
   function onResizeDown(e: React.PointerEvent, f: BoardFrame) {
     e.stopPropagation()
+    if (!track(e)) return
     setSel({ kind: 'frame', id: f.id })
     setDrag({ kind: 'resize', id: f.id, startX: e.clientX, startY: e.clientY, origin: { x: f.x, y: f.y }, frameSize: { w: f.w, h: f.h }, moved: false })
   }
 
   function onPortDown(e: React.PointerEvent, n: BoardNode) {
     e.stopPropagation()
+    if (!track(e)) return
     const p = toWorld(e.clientX, e.clientY)
     setWire({ from: n.id, x: p.x, y: p.y })
     setDrag({ kind: 'connect', id: n.id, startX: e.clientX, startY: e.clientY, origin: { x: 0, y: 0 }, moved: false })
   }
 
+  /* Pinch und Fingerbuchhaltung laufen unabhaengig vom Ziehen — sonst waeren
+     beim Aufziehen ohne aktiven Drag gar keine Listener gebunden. */
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      const p = pinch.current
+      if (!p || pointers.current.size < 2) return
+      const [a, b] = [...pointers.current.values()]
+      const dist = Math.hypot(a.x - b.x, a.y - b.y)
+      if (p.dist < 1) return
+
+      const r = wrapRef.current!.getBoundingClientRect()
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, p.view.z * (dist / p.dist)))
+      const k = z / p.view.z
+      // Der Punkt zwischen den Fingern bleibt stehen, und das Board folgt
+      // zusaetzlich, wenn die beiden Finger gemeinsam wandern.
+      const cx = (a.x + b.x) / 2 - r.left
+      const cy = (a.y + b.y) / 2 - r.top
+      const ox = p.cx - r.left
+      const oy = p.cy - r.top
+      setView({ z, x: cx - (ox - p.view.x) * k, y: cy - (oy - p.view.y) * k })
+    }
+
+    const onUp = (e: PointerEvent) => {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size < 2) pinch.current = null
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [])
+
   useEffect(() => {
     if (!drag) return
 
     const onMove = (e: PointerEvent) => {
+      if (pinch.current) return
       const dx = e.clientX - drag.startX
       const dy = e.clientY - drag.startY
       if (!drag.moved && Math.hypot(dx, dy) > 3) drag.moved = true
@@ -165,23 +242,23 @@ export function Board() {
       } else if (drag.kind === 'node') {
         update((d) => {
           const n = d.nodes.find((x) => x.id === drag.id)
-          if (n) { n.x = drag.origin.x + dx / view.z; n.y = drag.origin.y + dy / view.z }
+          if (n) { n.x = drag.origin.x + dx / viewRef.current.z; n.y = drag.origin.y + dy / viewRef.current.z }
         }, { transient: true })
       } else if (drag.kind === 'frame') {
         update((d) => {
           const f = d.frames.find((x) => x.id === drag.id)
-          if (f) { f.x = drag.origin.x + dx / view.z; f.y = drag.origin.y + dy / view.z }
+          if (f) { f.x = drag.origin.x + dx / viewRef.current.z; f.y = drag.origin.y + dy / viewRef.current.z }
           for (const c of drag.carried ?? []) {
             const n = d.nodes.find((x) => x.id === c.id)
-            if (n) { n.x = c.x + dx / view.z; n.y = c.y + dy / view.z }
+            if (n) { n.x = c.x + dx / viewRef.current.z; n.y = c.y + dy / viewRef.current.z }
           }
         }, { transient: true })
       } else if (drag.kind === 'resize') {
         update((d) => {
           const f = d.frames.find((x) => x.id === drag.id)
           if (f && drag.frameSize) {
-            f.w = Math.max(160, drag.frameSize.w + dx / view.z)
-            f.h = Math.max(120, drag.frameSize.h + dy / view.z)
+            f.w = Math.max(160, drag.frameSize.w + dx / viewRef.current.z)
+            f.h = Math.max(120, drag.frameSize.h + dy / viewRef.current.z)
           }
         }, { transient: true })
       } else if (drag.kind === 'connect') {
@@ -205,14 +282,20 @@ export function Board() {
       commit()
       // Erster Klick raeumt die Auswahl ab, der naechste legt an — auf der
       // freien Flaeche wie innerhalb eines Bereichs.
-      if (drag.kind === 'pan' && !drag.moved) {
+      const multiTouch = pinch.current !== null || pointers.current.size > 0
+      if (drag.kind === 'pan' && !drag.moved && !multiTouch) {
         if (sel) setSel(null)
         else {
           const p = toWorld(e.clientX, e.clientY)
           addNode(p.x, p.y)
         }
       }
-      if (drag.kind === 'frame' && !drag.moved && drag.wasSelected) {
+      // Ohne Maus gibt es keinen Doppelklick — ein Tipp auf den gewaehlten
+      // Knoten oeffnet deshalb den Text.
+      if (drag.kind === 'node' && !drag.moved && drag.wasSelected && !multiTouch) {
+        setEditingId(drag.id!)
+      }
+      if (drag.kind === 'frame' && !drag.moved && drag.wasSelected && !multiTouch) {
         const p = toWorld(e.clientX, e.clientY)
         addNode(p.x, p.y)
       }
@@ -221,12 +304,14 @@ export function Board() {
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag, wire, view.z, sel, edges])
+  }, [drag, wire, sel, edges])
 
   /* ------------------ Zoom & Tasten ------------------ */
 
@@ -289,6 +374,7 @@ export function Board() {
   }
 
   const selNode = sel?.kind === 'node' ? nodes.find((n) => n.id === sel.id) : undefined
+  const touchLike = typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches
 
   return (
     <div className={'board-wrap' + (drag?.kind === 'pan' ? ' panning' : '')} ref={wrapRef}>
@@ -394,7 +480,9 @@ export function Board() {
         <div className="board-hint">
           {nodes.length === 0
             ? 'Irgendwo hinklicken und losschreiben'
-            : 'Klick = neu · Ziehen = schieben · Punkt rechts = verbinden · ⌘/Strg + Scroll = Zoom'}
+            : touchLike
+              ? 'Tippen = neu · Ziehen = schieben · zwei Finger = zoomen'
+              : 'Klick = neu · Ziehen = schieben · Punkt rechts = verbinden · ⌘/Strg + Scroll = Zoom'}
         </div>
       </div>
 
