@@ -939,9 +939,18 @@ h2.section-title {
     0 1px 2px rgba(20, 22, 28, .05),
     0 14px 30px -12px rgba(20, 22, 28, .26);
 }
-.node--sel {
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 2px var(--cobalt-wash), 0 14px 30px -12px rgba(20, 22, 28, .26);
+/* Doppelte Klasse, sonst gewinnt `.node:hover` mit seinem eigenen Schatten
+   und der Ring verschwindet genau dann, wenn der Zeiger noch draufsteht.
+   Auswahl als Ring aussen herum, nicht als neue Randfarbe: sonst wird aus
+   einer orangen Karte beim Anwaehlen eine blaue, und die Farbe bedeutet
+   ploetzlich "ausgewaehlt" statt "gehoert zu dieser Gruppe". Der schmale
+   Spalt in der Bodenfarbe haelt den Ring auch auf einer kobaltblauen Karte
+   sichtbar. */
+.node.node--sel {
+  box-shadow:
+    0 0 0 2px var(--paper-sunk),
+    0 0 0 4px var(--cobalt),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
 }
 .node--dragging {
   cursor: grabbing; opacity: .9;
@@ -949,9 +958,11 @@ h2.section-title {
   box-shadow: 0 20px 40px -14px rgba(20, 22, 28, .34);
 }
 /* Der Knoten, auf dem gerade losgelassen wuerde. */
-.node--drop {
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px var(--cobalt-wash), 0 14px 30px -12px rgba(20, 22, 28, .26);
+.node.node--drop {
+  box-shadow:
+    0 0 0 2px var(--paper-sunk),
+    0 0 0 5px var(--cobalt),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
 }
 
 .node-text {
@@ -1009,7 +1020,9 @@ h2.section-title {
   background: color-mix(in srgb, var(--surface) 42%, transparent);
   cursor: grab;
 }
-.frame--sel { border-color: var(--cobalt); border-style: solid; }
+.frame.frame--sel {
+  box-shadow: 0 0 0 2px var(--paper-sunk), 0 0 0 4px var(--cobalt);
+}
 .frame-label {
   position: absolute; top: -12px; left: 14px;
   z-index: 1;
@@ -1133,10 +1146,12 @@ h2.section-title {
 }
 
 /* Der Bereich, ueber dem die Maus in der Liste steht. */
+/* Hervorhebung beim Ueberfahren der Liste: eine Aufhellung in der eigenen
+   Farbe des Bereichs. Frueher wurde hier der Rand auf Kobalt gesetzt — nach
+   einem Klick blieb der Zeiger auf der Zeile stehen, und ein oranger Bereich
+   sah nach dem Hinfahren dauerhaft blau aus. */
 .frame--hot {
-  border-style: solid;
-  border-color: var(--cobalt);
-  background: color-mix(in srgb, var(--cobalt) 6%, transparent);
+  background: color-mix(in srgb, var(--n, var(--cobalt)) 10%, transparent);
 }
 
 /* Nur beim Anspringen aus der Liste — waehrend des Ziehens wuerde eine
