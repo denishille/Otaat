@@ -460,12 +460,12 @@ export function Board() {
                 }
                 style={{
                   left: n.x, top: n.y, width: n.w,
-                  borderColor: isSel ? undefined : `color-mix(in srgb, var(--n-${n.color}) 45%, var(--line-strong))`,
+                  // Die Karte faerbt sich im Stylesheet aus diesem Wert.
+                  ['--n' as string]: `var(--n-${n.color})`,
                 }}
                 onPointerDown={(e) => onNodeDown(e, n)}
                 onDoubleClick={() => setEditingId(n.id)}
               >
-                <div className="node-accent" style={{ background: `var(--n-${n.color})` }} />
                 <div
                   className="node-text"
                   contentEditable={editingId === n.id}
@@ -489,8 +489,18 @@ export function Board() {
                   {n.text}
                 </div>
                 {n.isGoal && (
-                  <div className="node-goalbadge">
-                    Ziel{mom && mom.possible > 0 ? ` · ${Math.round((mom.hits / mom.possible) * 100)}% / 30 T` : ''}
+                  <div className="node-goal-foot">
+                    <span className="node-goal-tag">Ziel</span>
+                    {mom && mom.possible > 0 ? (
+                      <>
+                        <div className="node-goal-bar">
+                          <i style={{ width: `${Math.round((mom.hits / mom.possible) * 100)}%` }} />
+                        </div>
+                        <span className="node-goal-pct">{Math.round((mom.hits / mom.possible) * 100)}%</span>
+                      </>
+                    ) : (
+                      <span className="node-goal-pct">noch kein Check verknüpft</span>
+                    )}
                   </div>
                 )}
                 <div className="port" onPointerDown={(e) => onPortDown(e, n)} title="Verbinden" />

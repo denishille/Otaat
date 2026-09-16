@@ -774,37 +774,95 @@ h2.section-title {
 
 .board-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 
+/* Die Karte traegt ihre Farbe selbst: getoente Flaeche, Kante im selben Ton.
+   So lassen sich Gruppen auch im herausgezoomten Zustand auseinanderhalten,
+   statt dass nur ein Streifen am Rand davon erzaehlt. `--n` setzt die
+   Komponente je Knoten. */
 .node {
   position: absolute;
   touch-action: none;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-2);
-  padding: 11px 13px;
+  --tint: color-mix(in srgb, var(--n) 7%, var(--surface));
+  --edge: color-mix(in srgb, var(--n) 32%, var(--line-strong));
+  background: var(--tint);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(20, 22, 28, .045),
+    0 8px 22px -10px rgba(20, 22, 28, .18);
+  padding: 13px 15px;
   cursor: grab;
   user-select: none;
-  transition: box-shadow .15s, border-color .15s;
+  transition: box-shadow .18s, border-color .18s, transform .18s;
 }
-.node:hover { box-shadow: var(--shadow-3); }
-.node--sel { border-color: var(--cobalt); box-shadow: 0 0 0 2px var(--cobalt-wash), var(--shadow-3); }
-.node--dragging { cursor: grabbing; box-shadow: var(--shadow-3); opacity: .85; }
+:root[data-theme='dark'] .node { --tint: color-mix(in srgb, var(--n) 16%, var(--surface)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .node { --tint: color-mix(in srgb, var(--n) 16%, var(--surface)); }
+}
+
+.node:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 2px rgba(20, 22, 28, .05),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
+}
+.node--sel {
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 2px var(--cobalt-wash), 0 14px 30px -12px rgba(20, 22, 28, .26);
+}
+.node--dragging {
+  cursor: grabbing; opacity: .9;
+  transform: translateY(-2px) rotate(-.6deg);
+  box-shadow: 0 20px 40px -14px rgba(20, 22, 28, .34);
+}
 /* Der Knoten, auf dem gerade losgelassen wuerde. */
 .node--drop {
   border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px var(--cobalt-wash), var(--shadow-3);
+  box-shadow: 0 0 0 3px var(--cobalt-wash), 0 14px 30px -12px rgba(20, 22, 28, .26);
 }
-.node-accent { position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; }
+
 .node-text {
-  font-size: 13.5px; line-height: 1.42; white-space: pre-wrap; word-break: break-word;
-  outline: none; min-height: 19px;
+  font-size: 14px; line-height: 1.45; letter-spacing: -.005em;
+  white-space: pre-wrap; word-break: break-word;
+  outline: none; min-height: 20px;
 }
 .node-text:focus { cursor: text; }
-.node--goal { border-width: 1.5px; }
-.node-goalbadge {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-top: 7px; font-family: var(--mono); font-size: 10px;
-  color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em;
+.node-text:empty::before {
+  content: 'Schreib was…';
+  color: var(--ink-4);
+}
+
+/* Ziele sind die Knoten, auf die etwas einzahlt — sie duerfen lauter sein. */
+.node--goal {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--n) 55%, var(--line-strong));
+}
+.node--goal .node-text { font-weight: 600; }
+
+.node-goal-foot {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 11px; padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--n) 20%, var(--line));
+}
+.node-goal-tag {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: color-mix(in srgb, var(--n) 70%, var(--ink-3));
+  white-space: nowrap;
+}
+/* Wie stark das Ziel in den letzten 30 Tagen bedient wurde. */
+.node-goal-bar {
+  flex: 1; height: 4px; border-radius: 2px;
+  background: color-mix(in srgb, var(--n) 15%, var(--paper-sunk));
+  overflow: hidden;
+}
+.node-goal-bar i {
+  display: block; height: 100%; border-radius: 2px;
+  background: var(--n);
+  transition: width .5s cubic-bezier(.2,.9,.2,1);
+}
+.node-goal-pct {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .frame {
