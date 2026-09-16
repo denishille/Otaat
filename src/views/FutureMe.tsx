@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore, update, uid, calendarFeedUrl } from '../lib/store'
 import type { Cadence, Reminder } from '../lib/types'
 import { CATALOG, CATALOG_BY_CATEGORY, type Preset } from '../data/catalog'
-import { advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
+import { addDays, addMonths, advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
 import { XP_REMINDER_DONE } from '../lib/xp'
 import { downloadICS } from '../lib/ics'
-import { Cal, Check, Plus, Trash } from '../components/Icons'
+import { Cal, Check, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
@@ -17,6 +17,8 @@ export function FutureMe() {
   const [filter, setFilter] = useState<Filter>({ kind: 'radar' })
   const [picker, setPicker] = useState(false)
   const [cal, setCal] = useState(false)
+  const [dating, setDating] = useState<Reminder | null>(null)
+  const [reset, setReset] = useState(false)
   const [editing, setEditing] = useState<Reminder | 'new' | null>(null)
 
   const rem = state.reminders
@@ -55,6 +57,12 @@ export function FutureMe() {
     toast(`„${r.title}" erledigt`, XP_REMINDER_DONE)
   }
 
+  /** Abbestellen: der Eintrag verschwindet, der Katalog bietet ihn wieder an. */
+  function drop(r: Reminder) {
+    update((d) => { d.reminders = d.reminders.filter((x) => x.id !== r.id) })
+    toast(`„${r.title}" abbestellt`)
+  }
+
   return (
     <>
       <div className="today-head">
@@ -65,6 +73,7 @@ export function FutureMe() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn--ghost" onClick={() => setCal(true)} disabled={!rem.length}><Cal /> Kalender</button>
           <button className="btn btn--ghost" onClick={() => setPicker(true)}>Aus dem Regal</button>
+          <button className="btn btn--quiet" onClick={() => setReset(true)} disabled={!rem.length}>Aufräumen</button>
           <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus /> Eigenes</button>
         </div>
       </div>
@@ -119,11 +128,18 @@ export function FutureMe() {
                   {r.done ? (
                     <span className="chip chip--good">erledigt</span>
                   ) : (
-                    <>
-                      <span className={'chip ' + (overdue ? 'chip--warn' : soon ? 'chip--sel' : 'chip--line')}>{relativeDue(r.due, now)}</span>
-                      <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>{shortDate(r.due)}</span>
-                    </>
+                    <button
+                      className={'chip chip--btn ' + (overdue ? 'chip--warn' : soon ? 'chip--sel' : 'chip--line')}
+                      onClick={() => setDating(r)}
+                      title="Termin ändern"
+                    >
+                      {relativeDue(r.due, now)}
+                      <span className="chip-date">{shortDate(r.due)}</span>
+                    </button>
                   )}
+                  <button className="fm-drop" onClick={() => drop(r)} aria-label="Abbestellen" title="Abbestellen">
+                    <X />
+                  </button>
                 </div>
               </div>
             )
@@ -132,6 +148,13 @@ export function FutureMe() {
       </div>
 
       {cal && <CalendarSheet onClose={() => setCal(false)} />}
+      {dating && <DueSheet reminder={dating} onClose={() => setDating(null)} />}
+      {reset && (
+        <ResetSheet
+          scope={filter.kind === 'cat' ? filter.name : null}
+          onClose={() => setReset(false)}
+        />
+      )}
       {picker && <CatalogPicker onClose={() => setPicker(false)} />}
       {editing && <ReminderEditor reminder={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
@@ -139,6 +162,122 @@ export function FutureMe() {
 }
 
 /* ---------------------------------------------------------------- */
+
+const SHIFTS: { label: string; days?: number; months?: number }[] = [
+  { label: 'morgen', days: 1 },
+  { label: 'in 1 Woche', days: 7 },
+  { label: 'in 1 Monat', months: 1 },
+  { label: 'in 3 Monaten', months: 3 },
+  { label: 'in 6 Monaten', months: 6 },
+  { label: 'in 1 Jahr', months: 12 },
+]
+
+/** Nur der naechste Termin — ohne den Rhythmus anzufassen. */
+function DueSheet({ reminder, onClose }: { reminder: Reminder; onClose: () => void }) {
+  const [due, setDue] = useState(reminder.due)
+
+  const save = (value: string) => {
+    update((d) => {
+      const i = d.reminders.findIndex((x) => x.id === reminder.id)
+      if (i >= 0) d.reminders[i] = { ...d.reminders[i], due: value, done: false }
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet
+      title={reminder.title}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn--ghost" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn--primary" onClick={() => save(due)}>Übernehmen</button>
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor="due-date">Fällig am</label>
+        <input id="due-date" className="input mono" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+      </div>
+
+      <div className="field">
+        <label>Oder schnell verschieben</label>
+        <div className="choice">
+          {SHIFTS.map((sh) => {
+            const target = sh.months ? addMonths(today(), sh.months) : addDays(today(), sh.days ?? 0)
+            return (
+              <button key={sh.label} onClick={() => setDue(target)} aria-pressed={due === target}>
+                {sh.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <p className="chart-note" style={{ margin: 0 }}>
+        Ändert nur den nächsten Termin. Der Rhythmus <b>{cadenceLabel(reminder.cadence)}</b> bleibt
+        und zählt ab hier weiter — den änderst du über den Titel.
+      </p>
+    </Sheet>
+  )
+}
+
+/** Abbestellen in groesseren Portionen. */
+function ResetSheet({ scope, onClose }: { scope: string | null; onClose: () => void }) {
+  const { state } = useStore()
+  const [confirm, setConfirm] = useState<null | 'done' | 'scope' | 'all'>(null)
+
+  const rem = state.reminders
+  const doneCount = rem.filter((r) => r.done).length
+  const scopeCount = scope ? rem.filter((r) => r.category === scope).length : 0
+
+  const run = (what: 'done' | 'scope' | 'all') => {
+    update((d) => {
+      if (what === 'done') d.reminders = d.reminders.filter((r) => !r.done)
+      else if (what === 'scope') d.reminders = d.reminders.filter((r) => r.category !== scope)
+      else d.reminders = []
+    })
+    toast(what === 'all' ? 'Future Me Problems geleert' : 'Abbestellt')
+    onClose()
+  }
+
+  const Row = ({ id, title, sub, n }: { id: 'done' | 'scope' | 'all'; title: string; sub: string; n: number }) => (
+    <div className="reset-row">
+      <div>
+        <div className="fm-title">{title}</div>
+        <div className="fm-meta"><span>{sub}</span></div>
+      </div>
+      {confirm === id ? (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn--quiet btn--sm" onClick={() => setConfirm(null)}>Abbrechen</button>
+          <button className="btn btn--primary btn--sm" onClick={() => run(id)}>Wirklich</button>
+        </div>
+      ) : (
+        <button className="btn btn--ghost btn--sm btn--danger" disabled={n === 0} onClick={() => setConfirm(id)}>
+          {n} entfernen
+        </button>
+      )}
+    </div>
+  )
+
+  return (
+    <Sheet
+      title="Aufräumen"
+      onClose={onClose}
+      footer={<button className="btn btn--primary" onClick={onClose}>Fertig</button>}
+    >
+      <Row id="done" title="Erledigte" sub="Einmalige Sachen, die durch sind" n={doneCount} />
+      {scope && (
+        <Row id="scope" title={scope} sub="Alles aus dieser Kategorie" n={scopeCount} />
+      )}
+      <Row id="all" title="Alles" sub="Die Liste ist danach leer" n={rem.length} />
+      <p className="chart-note" style={{ margin: 0 }}>
+        Abbestellte Einträge stehen im Regal wieder zur Auswahl. Erfasste Termine aus
+        dem Everything Checker sind davon nicht betroffen.
+      </p>
+    </Sheet>
+  )
+}
 
 function CalendarSheet({ onClose }: { onClose: () => void }) {
   const { state, userId } = useStore()
@@ -214,9 +353,15 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
     })).filter((g) => g.items.length)
   }, [q])
 
-  function add(p: Preset) {
-    update((d) => { d.reminders.push(fromPreset(p)) })
-    toast(`„${p.title}" übernommen`)
+  /** Ein Tipp uebernimmt, der naechste bestellt wieder ab. */
+  function toggle(p: Preset) {
+    if (taken.has(p.id)) {
+      update((d) => { d.reminders = d.reminders.filter((r) => r.presetId !== p.id) })
+      toast(`„${p.title}" abbestellt`)
+    } else {
+      update((d) => { d.reminders.push(fromPreset(p)) })
+      toast(`„${p.title}" übernommen`)
+    }
   }
 
   function addAll(items: Preset[]) {
@@ -234,7 +379,7 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
       footer={
         <>
           <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>
-            {CATALOG.length} Einträge · Termine kannst du danach einzeln verschieben
+            {CATALOG.length} Einträge · nochmal tippen bestellt wieder ab
           </span>
           <button className="btn btn--primary" onClick={onClose}>Fertig</button>
         </>
@@ -255,12 +400,17 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
           </div>
           <div className="cat-grid">
             {g.items.map((p) => (
-              <button key={p.id} className={'cat-row' + (taken.has(p.id) ? ' cat-row--added' : '')} onClick={() => add(p)}>
+              <button
+                key={p.id}
+                className={'cat-row' + (taken.has(p.id) ? ' cat-row--added' : '')}
+                onClick={() => toggle(p)}
+                title={taken.has(p.id) ? 'Abbestellen' : 'Übernehmen'}
+              >
                 <div style={{ minWidth: 0 }}>
                   <div className="cat-row-title">{p.title}</div>
                   <div className="cat-row-sub">{cadenceLabel(p.cadence)}{p.note ? ` · ${p.note}` : ''}</div>
                 </div>
-                <span className="cat-plus">{taken.has(p.id) ? '✓' : '+'}</span>
+                <span className="cat-plus">{taken.has(p.id) ? <Check /> : '+'}</span>
               </button>
             ))}
           </div>

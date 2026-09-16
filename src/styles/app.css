@@ -47,7 +47,7 @@ a { color: var(--cobalt); text-decoration: none; }
   user-select: none; cursor: pointer; min-width: 0;
 }
 .brand-mark {
-  font-size: 22px; color: var(--ink-3); flex-shrink: 0;
+  font-size: 25px; color: var(--ink-2); flex-shrink: 0;
   transition: transform .6s cubic-bezier(.2,.9,.2,1);
 }
 .brand:hover .brand-mark { transform: rotate(45deg); }
@@ -730,7 +730,34 @@ h2.section-title {
 .fm-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
 .fm-meta .mono { font-size: 11.5px; }
 
-.fm-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.fm-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Der Termin ist anklickbar — dort aendert man ihn, ohne den Rhythmus anzufassen. */
+.chip--btn { cursor: pointer; transition: filter .13s; }
+.chip--btn:hover { filter: brightness(.95); }
+.chip-date {
+  font-family: var(--mono); font-size: 10.5px; opacity: .65;
+  padding-left: 7px; margin-left: 1px;
+  border-left: 1px solid currentColor;
+}
+
+/* Abbestellen: unaufdringlich, aber ohne Umweg ueber ein Formular. */
+.fm-drop {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--ink-4); font-size: 12px;
+  opacity: 0; transition: all .13s;
+}
+.fm-item:hover .fm-drop { opacity: 1; }
+.fm-drop:hover { color: var(--signal); background: var(--signal-wash); }
+@media (hover: none) { .fm-drop { opacity: .6; } }
+
+.reset-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 13px 16px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface);
+}
 
 /* Catalog picker */
 .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 9px; }
@@ -741,7 +768,10 @@ h2.section-title {
   transition: all .13s;
 }
 .cat-row:hover { border-color: var(--cobalt); background: var(--cobalt-wash); }
-.cat-row--added { opacity: .45; pointer-events: none; }
+.cat-row--added { border-color: var(--good); background: var(--good-wash); }
+.cat-row--added:hover { border-color: var(--signal); background: var(--signal-wash); }
+.cat-row--added .cat-plus { color: var(--good); font-size: 13px; }
+.cat-row--added:hover .cat-plus { color: var(--signal); }
 .cat-row-title { font-size: 13.5px; font-weight: 550; }
 .cat-row-sub { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 .cat-plus { margin-left: auto; color: var(--ink-4); font-size: 18px; line-height: 1; }
@@ -1010,9 +1040,25 @@ h2.section-title {
   .fm-cat span { display: none; }
 }
 
-@media (max-width: 900px) {
+/* Die kurzen Seitennamen halten bis dort, wo der ausgeschriebene Titel und
+   die langen Namen zusammen wirklich Platz haben. Vorher legte sich der
+   Titel ueber die Navigation, weil er nicht umbricht. */
+@media (max-width: 1120px) {
   .nav-long { display: none; }
   .nav-short { display: inline; }
+}
+
+/* Unterhalb dieser Breite steht der Titel in einer eigenen Zeile ueber der
+   Navigation — nebeneinander passt beides nicht mehr. */
+@media (max-width: 900px) {
+  .topbar {
+    padding: 8px 14px; gap: 8px 10px; height: auto;
+    flex-wrap: wrap; align-items: center;
+  }
+  .brand { order: 1; }
+  .topbar-right { order: 2; margin-left: auto; }
+  .nav { order: 3; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
 }
 
 @media (max-width: 680px) {
@@ -1026,16 +1072,9 @@ h2.section-title {
   .board-toolbar .btn { padding: 6px 9px; }
   .swatch { width: 26px; height: 26px; }
   .swatch i { width: 17px; height: 17px; }
-  .topbar {
-    padding: 8px 14px; gap: 8px 10px; height: auto;
-    flex-wrap: wrap; align-items: center;
-  }
-  .brand { order: 1; }
-  .topbar-right { order: 2; }
-  /* Der Name steht oben, die Seiten darunter — sonst passt beides nicht nebeneinander. */
-  .nav { order: 3; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
   .wordmark { font-size: 10.5px; letter-spacing: .13em; }
   .wordmark i { font-size: 15px; }
+  .brand-mark { font-size: 21px; }
   .nav::-webkit-scrollbar { display: none; }
   .nav-item { padding: 6px 9px; font-size: 13px; }
   .topbar-right { gap: 6px; }

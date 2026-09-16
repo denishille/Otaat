@@ -44,23 +44,38 @@ export const Dots = (p: P) => (
   <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" {...p}><circle cx="4" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12" cy="8" r="1.3" /></svg>
 )
 
-/** Die Bildmarke: acht Punkte auf der Kreisbahn, einer gefuellt. */
+/**
+ * Die Bildmarke: ein Bogen laeuft ueber den Kranz bis zum gefuellten Punkt.
+ * Ein Feld ausgefuellt in einer Menge — der Kreis ist der Tag, der Bogen das
+ * Stueck, das schon hinter einem liegt. Die Punkte werden zum aktiven hin
+ * praesenter, damit der Kranz eine Richtung bekommt.
+ */
 export const Mark = ({ className }: P) => {
-  const R = 29
-  const dots = Array.from({ length: 8 }, (_, i) => {
-    const a = -Math.PI / 2 + (i * Math.PI * 2) / 8
-    return { x: 50 + R * Math.cos(a), y: 50 + R * Math.sin(a), on: i === 1 }
-  })
+  const C = 50
+  const R = 30
+  const N = 12
+  const ON = 4
+  const TOP = -Math.PI / 2
+  const step = (Math.PI * 2) / N
+  const pol = (r: number, a: number) => [C + r * Math.cos(a), C + r * Math.sin(a)] as const
+
+  const [sx, sy] = pol(R, TOP)
+  const [ex, ey] = pol(R, TOP + (ON - 0.42) * step)
+  const [ax, ay] = pol(R, TOP + ON * step)
+
   return (
     <svg viewBox="0 0 100 100" width="1em" height="1em" className={className} aria-hidden="true">
-      <circle cx="50" cy="50" r={R} fill="none" stroke="currentColor" strokeWidth="0.8" opacity=".3" />
-      {dots.map((d, i) =>
-        d.on ? (
-          <circle key={i} cx={d.x} cy={d.y} r="7.1" fill="var(--cobalt)" />
-        ) : (
-          <circle key={i} cx={d.x} cy={d.y} r="5.8" fill="none" stroke="currentColor" strokeWidth="2.4" opacity=".55" />
-        ),
-      )}
+      <path
+        d={`M ${sx} ${sy} A ${R} ${R} 0 0 1 ${ex} ${ey}`}
+        fill="none" stroke="var(--cobalt)" strokeWidth="3.6" strokeLinecap="round"
+      />
+      {Array.from({ length: N }, (_, i) => {
+        if (i === ON) return null
+        const [x, y] = pol(R, TOP + i * step)
+        const near = 1 - Math.min(Math.abs(i - ON), N - Math.abs(i - ON)) / (N / 2)
+        return <circle key={i} cx={x} cy={y} r="3" fill="currentColor" opacity={0.45 + near * 0.45} />
+      })}
+      <circle cx={ax} cy={ay} r="7.2" fill="var(--cobalt)" />
     </svg>
   )
 }

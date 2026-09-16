@@ -17,80 +17,92 @@ const MUTED = '#3C4354'
 
 const pt = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)]
 
-/** A — Raster: 3x3, einer gefuellt, leicht aus der Mitte. */
-function grid(s = 512) {
-  const gap = s * 0.19
+const pol = (c, r, a) => [c + r * Math.cos(a), c + r * Math.sin(a)]
+/** Bogen auf der Kreisbahn, von Winkel a0 bis a1. */
+const arc = (c, r, a0, a1) => {
+  const [x0, y0] = pol(c, r, a0)
+  const [x1, y1] = pol(c, r, a1)
+  const large = Math.abs(a1 - a0) > Math.PI ? 1 : 0
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`
+}
+
+/** C1 — Lauf: ein Bogen laeuft bis zum gefuellten Punkt, davor Punkte, dahinter nichts. */
+function sweep(s = 512) {
   const c = s / 2
-  const r = s * 0.052
-  let o = ''
-  for (let y = -1; y <= 1; y++) {
-    for (let x = -1; x <= 1; x++) {
-      const on = x === 1 && y === -1
-      o += on
-        ? `<circle cx="${c + x * gap}" cy="${c + y * gap}" r="${r * 1.35}" fill="${COBALT}"/>`
-        : `<circle cx="${c + x * gap}" cy="${c + y * gap}" r="${r}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.022}"/>`
-    }
+  const R = s * 0.3
+  const N = 12
+  const ON = 4
+  const top = -Math.PI / 2
+  const step = (Math.PI * 2) / N
+  // Der Bogen endet kurz vor dem Punkt — so braucht es keine Aussparung in
+  // der Hintergrundfarbe und die Marke funktioniert auf jedem Untergrund.
+  let o = `<path d="${arc(c, R, top, top + (ON - 0.42) * step)}" fill="none" stroke="${COBALT}" stroke-width="${s * 0.028}" stroke-linecap="round" opacity=".9"/>`
+  for (let i = 0; i < N; i++) {
+    if (i === ON) continue
+    const [x, y] = pol(c, R, top + i * step)
+    // Punkte werden zum aktiven hin praesenter — das Jahr laeuft mit.
+    const near = 1 - Math.min(Math.abs(i - ON), N - Math.abs(i - ON)) / (N / 2)
+    o += `<circle cx="${x}" cy="${y}" r="${s * 0.026}" fill="${MUTED}" opacity="${(0.35 + near * 0.5).toFixed(2)}"/>`
   }
+  const [ax, ay] = pol(c, R, top + ON * step)
+  o += `<circle cx="${ax}" cy="${ay}" r="${s * 0.066}" fill="${COBALT}"/>`
   return o
 }
 
-/** B — Reihe: fuenf Punkte, der zweite gefuellt, mit Fokusring. */
-function row(s = 512) {
-  const c = s / 2
-  const gap = s * 0.175
-  const r = s * 0.052
-  let o = ''
-  for (let i = 0; i < 5; i++) {
-    const x = c + (i - 2) * gap
-    if (i === 1) {
-      o += `<circle cx="${x}" cy="${c}" r="${r * 2.1}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.016}"/>`
-      o += `<circle cx="${x}" cy="${c}" r="${r * 1.3}" fill="${COBALT}"/>`
-    } else {
-      o += `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.022}"/>`
-    }
-  }
-  return o
-}
-
-/** C — Zifferblatt: acht Punkte auf der Kreisbahn, einer gefuellt. */
-function dial(s = 512) {
+/** C2 — Halo: ruhiger Kranz, der aktive Punkt bekommt einen Ring. */
+function halo(s = 512) {
   const c = s / 2
   const R = s * 0.29
-  const r = s * 0.058
-  let o = `<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.008}" opacity=".55"/>`
-  for (let i = 0; i < 8; i++) {
-    const a = -Math.PI / 2 + (i * Math.PI * 2) / 8
-    const [x, y] = pt(c, c, R, a)
+  const N = 8
+  const top = -Math.PI / 2
+  let o = ''
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pol(c, R, top + (i * Math.PI * 2) / N)
     o += i === 1
-      ? `<circle cx="${x}" cy="${y}" r="${r * 1.22}" fill="${COBALT}"/>`
-      : `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.024}"/>`
+      ? `<circle cx="${x}" cy="${y}" r="${s * 0.105}" fill="none" stroke="${COBALT}" stroke-width="${s * 0.016}" opacity=".45"/>` +
+        `<circle cx="${x}" cy="${y}" r="${s * 0.058}" fill="${COBALT}"/>`
+      : `<circle cx="${x}" cy="${y}" r="${s * 0.038}" fill="${MUTED}"/>`
   }
   return o
 }
 
-/** D — Ausbruch: Raster, einer geht raus und zieht eine Spur. */
-function breakout(s = 512) {
-  const gap = s * 0.18
+/** C3 — Atem: die Punkte wachsen einmal um den Kreis, der groesste ist gefuellt. */
+function breath(s = 512) {
   const c = s / 2
-  const r = s * 0.05
-  const off = s * 0.1
+  const R = s * 0.29
+  const N = 10
+  const top = -Math.PI / 2
   let o = ''
-  for (let y = -1; y <= 1; y++) {
-    for (let x = -1; x <= 1; x++) {
-      if (x === 1 && y === -1) continue
-      o += `<circle cx="${c + x * gap}" cy="${c + y * gap}" r="${r}" fill="none" stroke="${MUTED}" stroke-width="${s * 0.021}"/>`
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pol(c, R, top + (i * Math.PI * 2) / N)
+    const t = i / (N - 1)
+    if (i === N - 1) {
+      o += `<circle cx="${x}" cy="${y}" r="${s * 0.072}" fill="${COBALT}"/>`
+    } else {
+      o += `<circle cx="${x}" cy="${y}" r="${s * (0.018 + t * 0.03)}" fill="${MUTED}" opacity="${(0.4 + t * 0.5).toFixed(2)}"/>`
     }
   }
-  const bx = c + gap + off
-  const by = c - gap - off
-  o += `<path d="M ${c + gap} ${c - gap} L ${bx} ${by}" stroke="${COBALT}" stroke-width="${s * 0.014}" stroke-linecap="round" opacity=".45"/>`
-  o += `<circle cx="${bx}" cy="${by}" r="${r * 1.4}" fill="${COBALT}"/>`
   return o
 }
 
-const DRAFTS = { a: grid, b: row, c: dial, d: breakout }
+/** C4 — Kern: Kranz aussen, der eine Punkt sitzt in der Mitte. */
+function core(s = 512) {
+  const c = s / 2
+  const R = s * 0.3
+  const N = 10
+  const top = -Math.PI / 2
+  let o = ''
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pol(c, R, top + (i * Math.PI * 2) / N)
+    o += `<circle cx="${x}" cy="${y}" r="${s * 0.032}" fill="${MUTED}" opacity=".7"/>`
+  }
+  o += `<circle cx="${c}" cy="${c}" r="${s * 0.105}" fill="${COBALT}"/>`
+  return o
+}
+
+const DRAFTS = { c1: sweep, c2: halo, c3: breath, c4: core }
 /** Der Entwurf, der in die App geht. */
-const CHOSEN = 'c'
+const CHOSEN = 'c1'
 
 const svg = (body, s = 512, bg = INK) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}" width="${s}" height="${s}">` +
