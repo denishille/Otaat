@@ -1003,10 +1003,12 @@ h2.section-title {
    Farbe. Liegt im DOM vor den Karten, deckt sie also nicht zu. */
 .frame {
   position: absolute; touch-action: none;
-  border: 1.5px solid color-mix(in srgb, var(--n, var(--line-strong)) 55%, var(--line-strong));
+  /* Gegen die helle Kante mischen, nicht gegen die der App: der Grund des
+     Bereichs ist in beiden Themes hell. */
+  border: 1.5px solid color-mix(in srgb, var(--n, var(--frame-line)) 62%, var(--frame-line));
   border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(20, 22, 28, .04);
+  background: var(--frame-bg);
+  box-shadow: 0 1px 2px rgba(20, 22, 28, .06);
   cursor: grab;
 }
 .frame--sel { border-color: var(--cobalt); border-style: solid; }
@@ -1014,13 +1016,16 @@ h2.section-title {
   position: absolute; top: -12px; left: 14px;
   z-index: 1;
   padding: 2px 9px; border-radius: var(--r-pill);
-  background: var(--surface); border: 1px solid var(--line-strong);
-  font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+  background: var(--frame-bg);
+  border: 1px solid color-mix(in srgb, var(--n, var(--frame-line)) 50%, var(--frame-line));
+  font-size: 11.5px; font-weight: 600;
+  /* Das Schild sitzt auf dem hellen Grund des Bereichs, nicht auf der App. */
+  color: var(--frame-ink);
   outline: none; white-space: nowrap;
 }
 .frame-resize {
   position: absolute; right: -8px; bottom: -8px; width: 18px; height: 18px;
-  border-radius: 3px; background: var(--surface); border: 1.5px solid var(--line-strong);
+  border-radius: 3px; background: var(--frame-bg); border: 1.5px solid var(--frame-line);
   cursor: nwse-resize;
 }
 
