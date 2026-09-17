@@ -513,13 +513,52 @@ export function initAuth() {
   })
 }
 
+/**
+ * Anmelden mit Passwort. Der normale Weg.
+ *
+ * Der Magic Link ist auf dem iPhone die schlechtere Wahl, und zwar aus zwei
+ * Gruenden: er oeffnet in Safari, und die App vom Homescreen hat einen
+ * eigenen Speicher — die Sitzung landet also im falschen Fach und man steht
+ * in der App weiter ohne Anmeldung da. Und Supabases eingebauter Mailer
+ * laesst nur zwei Mails pro Stunde durch, danach kommt 429.
+ */
+export async function signInWithPassword(mail: string, password: string) {
+  if (!supabase) throw new Error('Kein Supabase konfiguriert')
+  const { error } = await supabase.auth.signInWithPassword({ email: mail.trim(), password })
+  if (error) throw new Error(authMessage(error))
+}
+
+/** Magic Link — bleibt als Ausweg, wenn das Passwort weg ist. */
 export async function signIn(email: string) {
   if (!supabase) throw new Error('Kein Supabase konfiguriert')
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: window.location.origin },
   })
-  if (error) throw error
+  if (error) throw new Error(authMessage(error))
+}
+
+/** Passwort setzen oder aendern. Geht nur angemeldet. */
+export async function setPassword(password: string) {
+  if (!supabase || !userId) throw new Error('Nicht angemeldet')
+  if (password.length < 8) throw new Error('Mindestens 8 Zeichen.')
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw new Error(authMessage(error))
+}
+
+/** Die Fehler von GoTrue kommen englisch und kryptisch. */
+function authMessage(e: { message: string; code?: string }): string {
+  const code = e.code ?? ''
+  if (code === 'over_email_send_rate_limit' || /rate limit/i.test(e.message)) {
+    return 'Zu viele Mails. Der eingebaute Mailer von Supabase lässt nur zwei pro Stunde durch — nimm das Passwort.'
+  }
+  if (code === 'invalid_credentials' || /invalid login/i.test(e.message)) {
+    return 'Mail oder Passwort stimmt nicht.'
+  }
+  if (code === 'same_password') return 'Das ist das alte Passwort.'
+  if (code === 'weak_password') return 'Zu schwaches Passwort.'
+  if (/for security purposes/i.test(e.message)) return 'Zu schnell hintereinander. Kurz warten.'
+  return e.message
 }
 
 /** Token fuer den oeffentlichen Kalender-Feed. Liegt pro Nutzer in `profiles`. */

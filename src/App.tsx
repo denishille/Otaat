@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll, setUsername, type SyncStatus } from './lib/store'
+import { useStore, update, applyTheme, resolvedTheme, signIn, signInWithPassword, setPassword, signOut, pushAll, setUsername, type SyncStatus } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
 import { Today } from './views/Today'
 import { FutureMe } from './views/FutureMe'
@@ -127,8 +127,21 @@ const STATUS: Record<SyncStatus, string> = {
 function Account({ onClose }: { onClose: () => void }) {
   const { state, status, userId, email: userEmail, username, lastError } = useStore()
   const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
+
+  const enter = async () => {
+    if (!email.includes('@') || !pw) return
+    setBusy(true)
+    try {
+      await signInWithPassword(email, pw)
+      setPw('')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Anmeldung fehlgeschlagen')
+    }
+    setBusy(false)
+  }
 
   const send = async () => {
     setBusy(true)
@@ -185,6 +198,10 @@ function Account({ onClose }: { onClose: () => void }) {
               <span className="acc-k">Name</span>
               <NameField current={username} />
             </div>
+            <div className="acc-row">
+              <span className="acc-k">Passwort</span>
+              <PasswordField />
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -192,18 +209,35 @@ function Account({ onClose }: { onClose: () => void }) {
             <button className="btn btn--quiet btn--sm" onClick={() => void signOut()}>Abmelden</button>
           </div>
         </div>
-      ) : sent ? (
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)' }}>
-          Link ist unterwegs an <b>{email}</b>. Öffne ihn auf diesem Gerät.
-        </p>
       ) : (
-        <div className="field">
-          <label htmlFor="ac-mail">Anmelden per Magic Link</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input id="ac-mail" className="input" type="email" placeholder="du@example.com" value={email}
-              onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && email.includes('@') && void send()} />
-            <button className="btn btn--primary" disabled={!email.includes('@') || busy} onClick={() => void send()}>Link</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="field">
+            <label htmlFor="ac-mail">Mail</label>
+            <input id="ac-mail" className="input" type="email" placeholder="du@example.com"
+              autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
+          <div className="field">
+            <label htmlFor="ac-pw">Passwort</label>
+            <input id="ac-pw" className="input" type="password" autoComplete="current-password"
+              value={pw} onChange={(e) => setPw(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void enter()} />
+          </div>
+          <button className="btn btn--primary" disabled={!email.includes('@') || pw.length < 1 || busy}
+            onClick={() => void enter()}>Anmelden</button>
+
+          {/* Der Link ist der Ausweg, nicht der Hauptweg: er oeffnet in Safari,
+              und Supabase laesst nur zwei Mails pro Stunde durch. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Passwort weg?</span>
+            <button className="btn btn--quiet btn--sm" disabled={!email.includes('@') || busy}
+              onClick={() => void send()}>Link per Mail schicken</button>
+          </div>
+          {sent && (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>
+              Link ist unterwegs an <b>{email}</b>. Er öffnet in Safari — dort dann ein Passwort
+              setzen, damit du dich hier in der App anmelden kannst.
+            </p>
+          )}
         </div>
       )}
 
@@ -247,6 +281,38 @@ function NameField({ current }: { current: string | null }) {
         onBlur={() => void save()}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
+    </span>
+  )
+}
+
+/** Passwort setzen oder aendern, direkt im Konto-Blatt. */
+function PasswordField() {
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    if (!draft) return
+    setBusy(true)
+    try {
+      await setPassword(draft)
+      setDraft('')
+      toast('Passwort geändert')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ging nicht')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <span className="acc-name" style={{ display: 'flex', gap: 8 }}>
+      <input
+        className="input" type="password" autoComplete="new-password"
+        value={draft} placeholder="neues Passwort" disabled={busy}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && void save()}
+      />
+      <button className="btn btn--ghost btn--sm" disabled={draft.length < 8 || busy}
+        onClick={() => void save()}>Setzen</button>
     </span>
   )
 }
