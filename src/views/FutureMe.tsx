@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid, calendarFeedUrl } from '../lib/store'
 import type { Cadence, Reminder } from '../lib/types'
-import { CATALOG, CATALOG_BY_CATEGORY, type Preset } from '../data/catalog'
+import { CATALOG, CATALOG_BY_CATEGORY, CATEGORIES, type Preset } from '../data/catalog'
 import { addDays, addMonths, advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
 import { XP_REMINDER_DONE } from '../lib/xp'
 import { downloadICS } from '../lib/ics'
-import { Cal, Check, Pencil, Plus, Trash, X } from '../components/Icons'
+import { Cal, Check, ChevR, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
@@ -165,6 +165,98 @@ export function FutureMe() {
 }
 
 /* ---------------------------------------------------------------- */
+
+/**
+ * Kategorie waehlen oder neu schreiben.
+ *
+ * Vorher stand hier ein Feld mit `datalist` — Safari auf dem iPhone zeigt die
+ * praktisch nie an, und man sah nicht, welche Kategorien es ueberhaupt gibt.
+ * Diese Liste oeffnet sich beim Antippen, filtert waehrend des Tippens und
+ * bietet unverbrauchte Eingaben ausdruecklich als neue Kategorie an.
+ */
+function CategoryPicker({ value, onChange, options, counts }: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  counts: Record<string, number>
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const boxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    return () => window.removeEventListener('pointerdown', onDown)
+  }, [open])
+
+  const needle = query.trim().toLowerCase()
+  const shown = needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options
+  const isNew = needle.length > 0 && !options.some((o) => o.toLowerCase() === needle)
+
+  const pick = (v: string) => {
+    onChange(v)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div className="catpick" ref={boxRef}>
+      <button
+        id="r-cat"
+        type="button"
+        className={'catpick-field' + (value ? '' : ' catpick-field--empty')}
+        onClick={() => { setOpen((o) => !o); setQuery('') }}
+        aria-expanded={open}
+      >
+        <span>{value || 'Wählen oder neu schreiben'}</span>
+        <ChevR className={'catpick-caret' + (open ? ' catpick-caret--open' : '')} />
+      </button>
+
+      {open && (
+        <div className="catpick-panel">
+          <input
+            className="catpick-search"
+            placeholder="Suchen oder neue Kategorie …"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && needle) { e.preventDefault(); pick(query.trim()) }
+              if (e.key === 'Escape') setOpen(false)
+            }}
+            autoFocus={autoFocusUnlessTouch}
+            {...noAutofill}
+          />
+
+          <div className="catpick-list">
+            {isNew && (
+              <button className="catpick-row catpick-row--new" onClick={() => pick(query.trim())}>
+                <Plus />
+                <span>„{query.trim()}" anlegen</span>
+              </button>
+            )}
+            {shown.map((o) => (
+              <button
+                key={o}
+                className={'catpick-row' + (o === value ? ' catpick-row--on' : '')}
+                onClick={() => pick(o)}
+              >
+                <span className="catpick-name">{o}</span>
+                {counts[o] ? <span className="mono">{counts[o]}</span> : null}
+              </button>
+            ))}
+            {!shown.length && !isNew && (
+              <div className="catpick-empty">Nichts gefunden.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const SHIFTS: { label: string; days?: number; months?: number }[] = [
   { label: 'morgen', days: 1 },
@@ -459,10 +551,20 @@ const UNITS: { u: 'day' | 'week' | 'month' | 'year'; label: string }[] = [
 
 function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onClose: () => void }) {
   const { state } = useStore()
-  const existing = [...new Set([...state.reminders.map((r) => r.category), 'Sonstiges'])].sort((a, b) => a.localeCompare(b, 'de'))
+  // Erst die Kategorien des Regals in ihrer Reihenfolge — die ist nach
+  // Lebensbereichen sortiert, nicht alphabetisch —, dann alles, was nur in
+  // eigenen Eintraegen vorkommt.
+  const mine = new Set(state.reminders.map((r) => r.category))
+  const known: string[] = [...CATEGORIES]
+  const extra = [...mine].filter((c) => !known.includes(c)).sort((a, b) => a.localeCompare(b, 'de'))
+  const allCategories = [...known, ...extra, 'Sonstiges'].filter((c, i, a) => a.indexOf(c) === i)
+  const counts = state.reminders.reduce<Record<string, number>>((acc, r) => {
+    acc[r.category] = (acc[r.category] ?? 0) + 1
+    return acc
+  }, {})
 
   const [title, setTitle] = useState(reminder?.title ?? '')
-  const [category, setCategory] = useState(reminder?.category ?? existing[0] ?? 'Sonstiges')
+  const [category, setCategory] = useState(reminder?.category ?? '')
   const [repeats, setRepeats] = useState(reminder ? reminder.cadence.type === 'every' : true)
   const [n, setN] = useState(reminder?.cadence.type === 'every' ? String(reminder.cadence.n) : '1')
   const [unit, setUnit] = useState<'day' | 'week' | 'month' | 'year'>(reminder?.cadence.type === 'every' ? reminder.cadence.unit : 'year')
@@ -472,16 +574,17 @@ function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onCl
 
   const save = () => {
     if (!title.trim()) return
+    const cat = category.trim() || 'Sonstiges'
     const cadence: Cadence = repeats
       ? { type: 'every', n: Math.max(1, Number(n) || 1), unit }
       : { type: 'once', on: due }
     update((d) => {
       if (reminder) {
         const i = d.reminders.findIndex((r) => r.id === reminder.id)
-        if (i >= 0) d.reminders[i] = { ...d.reminders[i], title: title.trim(), category, cadence, due, lead: Number(lead) || 0, notes: notes.trim() || undefined, done: repeats ? false : d.reminders[i].done }
+        if (i >= 0) d.reminders[i] = { ...d.reminders[i], title: title.trim(), category: cat, cadence, due, lead: Number(lead) || 0, notes: notes.trim() || undefined, done: repeats ? false : d.reminders[i].done }
       } else {
         d.reminders.push({
-          id: uid(), title: title.trim(), category, cadence, due,
+          id: uid(), title: title.trim(), category: cat, cadence, due,
           lead: Number(lead) || 0, notes: notes.trim() || undefined,
           createdAt: new Date().toISOString(),
         })
@@ -520,8 +623,12 @@ function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onCl
 
       <div className="field">
         <label htmlFor="r-cat">Kategorie</label>
-        <input id="r-cat" className="input" list="r-cats" value={category} onChange={(e) => setCategory(e.target.value)} />
-        <datalist id="r-cats">{existing.map((c) => <option key={c} value={c} />)}</datalist>
+        <CategoryPicker
+          value={category}
+          onChange={setCategory}
+          options={allCategories}
+          counts={counts}
+        />
       </div>
 
       <div className="field">
