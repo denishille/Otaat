@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import type { AppState, CheckDef } from '../lib/types'
 import { byWeekday, fmt, series, summarize, type Point } from '../lib/stats'
-import { findInsights, loggedDays, MIN_DAYS, strengthLabel } from '../lib/insights'
+import { findInsights, loggedDays, MIN_DAYS } from '../lib/insights'
+import { InsightRow, insightKey } from '../components/InsightRow'
 import { longDate, shortDate } from '../lib/dates'
 import { Sheet } from '../components/Sheet'
 
@@ -22,7 +23,9 @@ export function CheckStats({
   const week = useMemo(() => byWeekday(points), [points])
   const related = useMemo(() => {
     if (loggedDays(state) < MIN_DAYS) return []
-    return findInsights(state).filter((i) => i.a.id === def.id || i.b.id === def.id).slice(0, 4)
+    return findInsights(state)
+      .filter((i) => i.a.check.id === def.id || i.b.check.id === def.id)
+      .slice(0, 5)
   }, [state, def])
 
   return (
@@ -70,21 +73,7 @@ export function CheckStats({
       {related.length > 0 && (
         <section>
           <div className="chart-head"><h4>Hängt zusammen mit</h4></div>
-          {related.map((i) => (
-            <div className="insight" key={`${i.a.id}-${i.b.id}-${i.lagged}`}>
-              <div className="insight-text">
-                War <b>{i.a.name}</b> hoch, war <b>{i.b.name}</b>{' '}
-                {i.lagged ? 'am nächsten Tag' : 'am selben Tag'} meist <b>{i.r > 0 ? 'hoch' : 'niedrig'}</b>.
-              </div>
-              <div className="insight-meta">
-                <span>{strengthLabel(i.r)}</span>
-                <div className={'insight-bar ' + (i.r > 0 ? 'insight-bar--up' : 'insight-bar--down')}>
-                  <i style={{ width: `${Math.min(100, Math.abs(i.r) * 100)}%` }} />
-                </div>
-                <span>{i.n} T</span>
-              </div>
-            </div>
-          ))}
+          {related.map((i) => <InsightRow key={insightKey(i)} i={i} />)}
         </section>
       )}
 

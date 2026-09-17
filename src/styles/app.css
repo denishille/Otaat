@@ -531,6 +531,19 @@ h2.section-title {
   background: var(--surface); box-shadow: var(--shadow-1);
 }
 .insight + .insight { margin-top: 8px; }
+
+/* Zweite Reihe: sieht so aus, haelt der Korrektur fuer Mehrfachvergleiche
+   aber noch nicht stand. Deshalb blasser und ohne Schatten. */
+.insights-sub {
+  margin: 20px 0 10px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+.insight--weak {
+  background: transparent; box-shadow: none;
+  border-style: dashed;
+}
+.insight--weak .insight-text { color: var(--ink-2); }
+.insight--weak + .insight--weak { margin-top: 6px; }
 .insight-text { font-size: 14px; line-height: 1.45; }
 .insight-text b { font-weight: 650; }
 .insight-meta {
@@ -1060,6 +1073,7 @@ h2.section-title {
 
 .scrim {
   position: fixed; inset: 0; z-index: 60;
+  overscroll-behavior: contain;
   background: rgba(20, 22, 28, .3);
   backdrop-filter: blur(3px);
   display: grid; place-items: center; padding: 24px;
@@ -1081,7 +1095,11 @@ h2.section-title {
   padding: 20px 22px 16px; border-bottom: 1px solid var(--line);
 }
 .sheet-head h3 { font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: -.02em; margin: 0; }
-.sheet-body { padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+.sheet-body {
+  padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  /* Am Ende der Liste soll nicht die Seite dahinter weiterscrollen. */
+  overscroll-behavior: contain;
+}
 /* Ohne das drueckt der Flex-Container Kacheln und Diagramme zusammen,
    sobald der Inhalt laenger wird als das Blatt. */
 .sheet-body > * { flex-shrink: 0; }

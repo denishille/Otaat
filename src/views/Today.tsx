@@ -3,7 +3,8 @@ import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
 import { activeChecks, carriedDefaults, isFilled, scoreDay, streak } from '../lib/scoring'
-import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
+import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
+import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
@@ -603,7 +604,10 @@ function Insights({ state }: { state: AppState }) {
     )
   }
 
-  if (found.length === 0) {
+  const solid = found.filter((i) => i.solid).slice(0, 6)
+  const hints = found.filter((i) => !i.solid).slice(0, 3)
+
+  if (!solid.length && !hints.length) {
     return (
       <div className="insights">
         <div className="insights-progress">
@@ -616,33 +620,25 @@ function Insights({ state }: { state: AppState }) {
     )
   }
 
-  const top = found.slice(0, 5)
-
   return (
     <section className="insights">
       <div className="insights-head">
         <h2 className="section-title">Was zusammenhängt</h2>
         <span className="insights-note">
-          aus {days} Tagen · zeigt Zusammenhänge, keine Ursachen
+          aus {days} Tagen · Zusammenhänge, keine Ursachen
         </span>
       </div>
 
-      {top.map((i) => (
-        <div className="insight" key={`${i.a.id}-${i.b.id}-${i.lagged}`}>
-          <div className="insight-text">
-            War <b>{i.a.name}</b> hoch, war <b>{i.b.name}</b>{' '}
-            {i.lagged ? 'am nächsten Tag' : 'am selben Tag'} meist{' '}
-            <b>{i.r > 0 ? 'hoch' : 'niedrig'}</b>.
+      {solid.map((i) => <InsightRow key={insightKey(i)} i={i} />)}
+
+      {hints.length > 0 && (
+        <>
+          <div className="insights-sub">
+            Noch nicht gesichert — sieht so aus, könnte bei dieser Zahl an Tagen aber Zufall sein.
           </div>
-          <div className="insight-meta">
-            <span>{strengthLabel(i.r)}</span>
-            <div className={'insight-bar ' + (i.r > 0 ? 'insight-bar--up' : 'insight-bar--down')}>
-              <i style={{ width: `${Math.min(100, Math.abs(i.r) * 100)}%` }} />
-            </div>
-            <span>{i.n} T</span>
-          </div>
-        </div>
-      ))}
+          {hints.map((i) => <InsightRow key={insightKey(i)} i={i} />)}
+        </>
+      )}
     </section>
   )
 }
