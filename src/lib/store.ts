@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { AppState, Board, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
 import { DEFAULT_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
+import { SUPABASE_URL, T } from '../data/otaat-source'
 
 const LS_KEY = 'otaat.state.v1'
 
@@ -267,17 +268,60 @@ function schedulePush() {
   pushTimer = setTimeout(() => void pushAll(), 900)
 }
 
-/** Reihen einer Tabelle ersetzen: upsert aller aktuellen + delete der verschwundenen. */
+/**
+ * Was zuletzt hochgeschoben wurde, je Tabelle: Id -> JSON der Zeile.
+ *
+ * Ohne das ginge bei jeder Aenderung der komplette Stand raus — auch die
+ * 180 Tage Kalorien, von denen sich keiner geaendert hat. Mit dem Abgleich
+ * wird aus dem Haken bei "Sauna" ein Upsert mit einer Zeile.
+ */
+const pushed = new Map<string, Map<string, string>>()
+
+/** Nach einem Wechsel des Kontos oder einem Pull stimmt der Abgleich nicht mehr. */
+function forgetPushed() {
+  pushed.clear()
+}
+
+/** Reihen einer Tabelle abgleichen: upsert der geaenderten, delete der verschwundenen. */
 async function replaceTable(table: string, rows: Record<string, unknown>[], keepIds: string[]) {
   if (!supabase || !userId) return
-  if (rows.length) {
-    const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' })
+
+  const seen = pushed.get(table)
+  const changed = seen
+    ? rows.filter((r) => seen.get(String(r.id)) !== JSON.stringify(r))
+    : rows
+
+  for (let i = 0; i < changed.length; i += 200) {
+    const { error } = await supabase.from(table).upsert(changed.slice(i, i + 200), { onConflict: 'id' })
     if (error) throw error
   }
-  let del = supabase.from(table).delete().eq('user_id', userId)
-  if (keepIds.length) del = del.not('id', 'in', `(${keepIds.map((i) => `"${i}"`).join(',')})`)
-  const { error } = await del
-  if (error) throw error
+
+  // Welche Ids es drueben gibt, steht in der Antwort, nicht in der URL.
+  // Frueher lief das Aufraeumen ueber `not in (...)` mit allen Ids im
+  // Query-String — bei 180 Tagen sind das acht Kilobyte URL, und daran
+  // erstickt frueher oder later irgendein Proxy dazwischen.
+  // Gefragt wird nur beim ersten Schub einer Sitzung; danach weiss der
+  // Abgleich selbst, was drueben liegt. Was ein anderes Geraet geloescht
+  // hat, raeumt ohnehin der naechste Pull auf.
+  let remote: string[]
+  if (seen) {
+    remote = [...seen.keys()]
+  } else {
+    const { data, error } = await supabase.from(table).select('id').eq('user_id', userId)
+    if (error) throw error
+    remote = (data ?? []).map((r) => String(r.id))
+  }
+
+  const keep = new Set(keepIds)
+  const gone = remote.filter((id) => !keep.has(id))
+  for (let i = 0; i < gone.length; i += 100) {
+    const { error } = await supabase.from(table).delete().eq('user_id', userId).in('id', gone.slice(i, i + 100))
+    if (error) throw error
+  }
+
+  const next = new Map<string, string>()
+  for (const r of rows) next.set(String(r.id), JSON.stringify(r))
+  pushed.set(table, next)
 }
 
 export async function pushAll() {
@@ -287,33 +331,33 @@ export async function pushAll() {
   try {
     const uid = userId
     await replaceTable(
-      'checks',
+      T.checks,
       state.checks.map((c) => ({ id: c.id, user_id: uid, payload: c })),
       state.checks.map((c) => c.id),
     )
     const dayRows = Object.values(state.days).map((d) => ({ id: `${uid}:${d.date}`, user_id: uid, date: d.date, payload: d }))
-    await replaceTable('days', dayRows, dayRows.map((d) => d.id))
+    await replaceTable(T.days, dayRows, dayRows.map((d) => d.id))
     await replaceTable(
-      'reminders',
+      T.reminders,
       state.reminders.map((r) => ({ id: r.id, user_id: uid, due: r.due, payload: r })),
       state.reminders.map((r) => r.id),
     )
     await replaceTable(
-      'board_nodes',
+      T.nodes,
       state.nodes.map((n) => ({ id: n.id, user_id: uid, payload: n })),
       state.nodes.map((n) => n.id),
     )
     await replaceTable(
-      'board_frames',
+      T.frames,
       state.frames.map((f) => ({ id: f.id, user_id: uid, payload: f })),
       state.frames.map((f) => f.id),
     )
     await replaceTable(
-      'board_edges',
+      T.edges,
       state.edges.map((g) => ({ id: g.id, user_id: uid, payload: g })),
       state.edges.map((g) => g.id),
     )
-    const { error } = await supabase.from('profiles').upsert({ id: uid, meta: state.meta }, { onConflict: 'id' })
+    const { error } = await supabase.from(T.profiles).upsert({ id: uid, meta: state.meta }, { onConflict: 'id' })
     if (error) throw error
     lastError = null
     status = 'synced'
@@ -330,38 +374,56 @@ export async function pullAll() {
   emit()
   try {
     const [checks, days, reminders, nodes, frames, edges, profile] = await Promise.all([
-      supabase.from('checks').select('payload'),
-      supabase.from('days').select('payload'),
-      supabase.from('reminders').select('payload'),
-      supabase.from('board_nodes').select('payload'),
-      supabase.from('board_frames').select('payload'),
-      supabase.from('board_edges').select('payload'),
-      supabase.from('profiles').select('meta').eq('id', userId).maybeSingle(),
+      supabase.from(T.checks).select('payload'),
+      supabase.from(T.days).select('payload'),
+      supabase.from(T.reminders).select('payload'),
+      supabase.from(T.nodes).select('payload'),
+      supabase.from(T.frames).select('payload'),
+      supabase.from(T.edges).select('payload'),
+      supabase.from(T.profiles).select('meta').eq('id', userId).maybeSingle(),
     ])
     const err = [checks, days, reminders, nodes, frames, edges, profile].find((r) => r.error)?.error
     if (err) throw err
 
-    const remoteChecks = (checks.data ?? []).map((r) => r.payload as CheckDef)
-    const remoteDays = (days.data ?? []).map((r) => r.payload as DayEntry)
-    const fresh = remoteChecks.length === 0 && remoteDays.length === 0
-
-    if (fresh) {
-      // Erstes Login auf diesem Account: lokalen Stand hochschieben statt ihn wegzuwerfen.
-      await pushAll()
-      return
-    }
-
-    state = {
-      checks: remoteChecks.sort((a, b) => a.sort - b.sort),
-      days: Object.fromEntries(remoteDays.map((d) => [d.date, d])),
+    const remote: AppState = {
+      checks: (checks.data ?? []).map((r) => r.payload as CheckDef),
+      days: Object.fromEntries((days.data ?? []).map((r) => {
+        const d = r.payload as DayEntry
+        return [d.date, d]
+      })),
       reminders: (reminders.data ?? []).map((r) => r.payload as Reminder),
       nodes: (nodes.data ?? []).map((r) => r.payload as BoardNode),
       frames: (frames.data ?? []).map((r) => r.payload as BoardFrame),
       edges: (edges.data ?? []).map((r) => r.payload as BoardEdge),
       meta: { ...emptyState().meta, ...((profile.data?.meta as AppState['meta']) ?? {}) },
     }
+
+    const merged = mergeIn(state, remote)
+    // Nur hochschieben, wenn die Vereinigung wirklich etwas beigetragen hat.
+    // Ein stumpfer Vergleich der beiden Objekte waere immer ungleich — andere
+    // Reihenfolge, andere Schluesselreihenfolge — und jeder App-Start wuerde
+    // den ganzen Bestand neu hochladen.
+    const grew =
+      Object.keys(merged.days).length !== Object.keys(remote.days).length ||
+      merged.checks.length !== remote.checks.length ||
+      merged.reminders.length !== remote.reminders.length ||
+      merged.nodes.length !== remote.nodes.length ||
+      merged.frames.length !== remote.frames.length ||
+      merged.edges.length !== remote.edges.length ||
+      merged.meta.boards.length !== remote.meta.boards.length ||
+      Object.entries(merged.days).some(([d, v]) => v.confirmed && !remote.days[d]?.confirmed)
+
+    state = merged
     applyTheme(state.meta.theme)
     saveLocal()
+    forgetPushed()
+    emit()
+
+    // Was nur hier lag, muss hoch — sonst steht es beim naechsten Geraet nicht da.
+    if (grew) {
+      await pushAll()
+      return
+    }
     lastError = null
     status = 'synced'
   } catch (e) {
@@ -369,6 +431,51 @@ export async function pullAll() {
     status = 'error'
   }
   emit()
+}
+
+/**
+ * Was drueben liegt und was hier liegt, zusammenfuehren.
+ *
+ * Der naive Weg — drueben gewinnt — kostet Daten: wer sich zuerst auf dem
+ * Laptop anmeldet, schiebt dessen leeren Stand hoch, und das iPhone mit den
+ * echten Tagen zieht ihn sich anschliessend ueber die eigenen. Deshalb wird
+ * vereinigt statt ersetzt.
+ *
+ * Regel: was es nur auf einer Seite gibt, bleibt. Wo beide Seiten dieselbe
+ * Kennung haben, gewinnt drueben — das ist der geteilte Stand — mit einer
+ * Ausnahme: ein bestaetigter Tag schlaegt einen unbestaetigten, egal von
+ * welcher Seite. Ein bestaetigter Tag ist eine Aussage, ein unbestaetigter
+ * nur ein Formular.
+ */
+function mergeIn(local: AppState, remote: AppState): AppState {
+  const byId = <X extends { id: string }>(mine: X[], theirs: X[]): X[] => {
+    const out = new Map(mine.map((x) => [x.id, x]))
+    for (const x of theirs) out.set(x.id, x)
+    return [...out.values()]
+  }
+
+  const days: Record<string, DayEntry> = { ...local.days }
+  for (const [date, their] of Object.entries(remote.days)) {
+    const mine = days[date]
+    days[date] = mine?.confirmed && !their.confirmed ? mine : their
+  }
+
+  // Checks sind Definitionen, keine Eintraege: drueben gewinnt, aber was es
+  // hier zusaetzlich gibt, bleibt stehen.
+  const checks = byId(local.checks, remote.checks).sort((a, b) => a.sort - b.sort)
+
+  return {
+    checks,
+    days,
+    reminders: byId(local.reminders, remote.reminders),
+    nodes: byId(local.nodes, remote.nodes),
+    frames: byId(local.frames, remote.frames),
+    edges: byId(local.edges, remote.edges),
+    meta: {
+      ...remote.meta,
+      boards: byId(local.meta.boards, remote.meta.boards),
+    },
+  }
 }
 
 export function initAuth() {
@@ -383,6 +490,7 @@ export function initAuth() {
     const next = session?.user.id ?? null
     if (next === userId) return
     userId = next
+    forgetPushed()
     if (userId) {
       status = 'syncing'
       emit()
@@ -406,9 +514,9 @@ export async function signIn(email: string) {
 /** Token fuer den oeffentlichen Kalender-Feed. Liegt pro Nutzer in `profiles`. */
 export async function calendarFeedUrl(): Promise<string | null> {
   if (!supabase || !userId) return null
-  const { data, error } = await supabase.from('profiles').select('calendar_token').eq('id', userId).maybeSingle()
+  const { data, error } = await supabase.from(T.profiles).select('calendar_token').eq('id', userId).maybeSingle()
   if (error || !data?.calendar_token) return null
-  const base = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+  const base = SUPABASE_URL.replace(/\/$/, '')
   return `${base}/functions/v1/calendar-feed?t=${data.calendar_token}`
 }
 

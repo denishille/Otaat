@@ -9,7 +9,8 @@
  *
  * Deploy:  supabase functions deploy calendar-feed --no-verify-jwt
  * (--no-verify-jwt ist noetig, weil Kalender-Clients keinen Bearer-Token
- *  schicken. Die Autorisierung laeuft ueber das unguessbare Token in der URL.)
+ *  schicken. Die Autorisierung laeuft ueber das unguessbare Token in der URL,
+ *  das in otaat_profiles.calendar_token steht.)
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -109,7 +110,7 @@ Deno.serve(async (req) => {
   )
 
   const { data: profile, error: pErr } = await admin
-    .from('profiles')
+    .from('otaat_profiles')
     .select('id')
     .eq('calendar_token', token)
     .maybeSingle()
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
   if (!profile) return new Response('unknown token', { status: 404 })
 
   const { data, error } = await admin
-    .from('reminders')
+    .from('otaat_reminders')
     .select('payload')
     .eq('user_id', profile.id)
     .order('due', { ascending: true })
