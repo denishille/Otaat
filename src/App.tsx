@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
-import { levelFor, titleFor } from './lib/xp'
 import { Today } from './views/Today'
 import { FutureMe } from './views/FutureMe'
 import { Board } from './views/Board'
@@ -9,6 +8,7 @@ import { Sheet } from './components/Sheet'
 import { Toasts, toast } from './components/Toasts'
 import { Mark, Moon, Sun } from './components/Icons'
 import { daysBetween, today } from './lib/dates'
+import { confirmedDays } from './lib/scoring'
 
 type Tab = 'today' | 'future' | 'board'
 
@@ -56,7 +56,6 @@ export default function App() {
     setTab(t)
   }
 
-  const { level, into, span } = levelFor(state.meta.xp)
   const due = state.reminders.filter((r) => !r.done && daysBetween(today(), r.due) <= r.lead).length
 
   const shown = resolvedTheme(state.meta.theme)
@@ -90,10 +89,6 @@ export default function App() {
         </nav>
 
         <div className="topbar-right">
-          <div className="xp" title={`${state.meta.xp} XP — ${titleFor(level)}`}>
-            <span className="xp-level">LVL {level}</span>
-            <div className="xp-track"><div className="xp-fill" style={{ width: `${(into / span) * 100}%` }} /></div>
-          </div>
           <button className="iconbtn" onClick={toggleTheme} aria-label="Hell / dunkel">
             {shown === 'dark' ? <Sun /> : <Moon />}
           </button>
@@ -123,8 +118,6 @@ function Account({ onClose }: { onClose: () => void }) {
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const { level } = levelFor(state.meta.xp)
-
   const send = async () => {
     setBusy(true)
     try {
@@ -150,10 +143,9 @@ function Account({ onClose }: { onClose: () => void }) {
       footer={<button className="btn btn--primary" onClick={onClose}>Schließen</button>}>
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <Stat k="Level" v={String(level)} />
-        <Stat k="XP" v={String(state.meta.xp)} />
-        <Stat k="Tage erfasst" v={String(Object.keys(state.days).length)} />
-        <Stat k="Einträge" v={String(state.reminders.length + state.nodes.length)} />
+        <Stat k="Tage abgeschickt" v={String(confirmedDays(state))} />
+        <Stat k="Future Me" v={String(state.reminders.length)} />
+        <Stat k="Knoten" v={String(state.nodes.length)} />
       </div>
 
       <hr className="divider" />

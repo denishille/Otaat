@@ -77,6 +77,14 @@ export function countedValues(s: AppState, date: string): Record<string, CheckVa
   return out
 }
 
+/**
+ * Tage, die abgeschickt wurden. Nur die zaehlen. Ein Tag, an dem bloss
+ * gemessene Werte liegen — die Kalorien-Historie aus dem Abgleich —, ist
+ * keiner: die stammen aus einer anderen Erfassung, nicht von hier.
+ */
+export const confirmedDays = (s: AppState): number =>
+  Object.values(s.days).filter((d) => d.confirmed).length
+
 export const activeChecks = (s: AppState): CheckDef[] =>
   s.checks.filter((c) => !c.archived).sort((a, b) => a.sort - b.sort)
 

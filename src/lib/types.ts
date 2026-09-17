@@ -44,10 +44,6 @@ export interface DayEntry {
    * nicht in Serie, Statistik oder Zusammenhaenge ein.
    */
   confirmed?: boolean
-  /** XP fuer diesen Tag wurde vergeben. Verhindert Nachzahlen beim erneuten Bestaetigen. */
-  paid?: boolean
-  /** @deprecated XP haengt jetzt am bestaetigten Tag, nicht am einzelnen Check. */
-  awarded?: ID[]
 }
 
 /* ---------- Future Me Problems ---------- */
@@ -128,7 +124,6 @@ export interface AppState {
   frames: BoardFrame[]
   edges: BoardEdge[]
   meta: {
-    xp: number
     theme: Theme
     dismissedPresets: string[]
     v?: number

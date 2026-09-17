@@ -3,7 +3,6 @@ import { useStore, update, uid, calendarFeedUrl } from '../lib/store'
 import type { Cadence, Reminder } from '../lib/types'
 import { CATALOG, CATALOG_BY_CATEGORY, CATEGORIES, type Preset } from '../data/catalog'
 import { addDays, addMonths, advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
-import { XP_REMINDER_DONE } from '../lib/xp'
 import { downloadICS } from '../lib/ics'
 import { Cal, Check, ChevR, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
@@ -52,9 +51,8 @@ export function FutureMe() {
         const base = daysBetween(item.due, today()) > 0 ? today() : item.due
         item.due = advance(base, item.cadence)
       }
-      d.meta.xp += XP_REMINDER_DONE
     })
-    toast(`„${r.title}" erledigt`, XP_REMINDER_DONE)
+    toast(`„${r.title}" erledigt`)
   }
 
   /** Abbestellen: der Eintrag verschwindet, der Katalog bietet ihn wieder an. */

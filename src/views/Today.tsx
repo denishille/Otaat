@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { SCALE_LABELS } from '../data/checks'
-import { activeChecks, carriedDefaults, isFilled, meetsTarget, scoreDay, streak } from '../lib/scoring'
+import { activeChecks, carriedDefaults, isFilled, scoreDay, streak } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays, strengthLabel } from '../lib/insights'
 import { addDays, longDate, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
-import { XP_DAY_COMPLETE, XP_GOAL_PAYOFF, XP_PER_CHECK } from '../lib/xp'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
@@ -62,9 +61,8 @@ export function Today() {
   /**
    * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,
    * nicht als Vorschlag. Nur fuer heute: aeltere Tage rueckwirkend zu fuellen
-   * wuerde Daten erfinden, die es nie gab.
-   * XP gibt es dafuer keine; die haengt weiter daran, dass man selbst etwas
-   * anfasst (`awarded` bleibt leer).
+   * wuerde Daten erfinden, die es nie gab. Gezaehlt wird der Tag davon
+   * nicht — dazu muss er bestaetigt werden.
    */
   useEffect(() => {
     if (date !== today()) return
@@ -95,21 +93,8 @@ export function Today() {
     update((d) => {
       const day = (d.days[date] ??= { date, values: {} })
       day.confirmed = true
-      if (day.paid) return
-      day.paid = true
-
-      let xp = sc.filled * XP_PER_CHECK
-      if (sc.total > 0 && sc.filled === sc.total) xp += XP_DAY_COMPLETE
-      for (const def of defs) {
-        if (def.goals?.length && meetsTarget(def, day.values[def.id])) {
-          xp += XP_GOAL_PAYOFF * def.goals.length
-        }
-      }
-      d.meta.xp += xp
     })
-
-    const bonus = sc.total > 0 && sc.filled === sc.total
-    toast(bonus ? 'Tag vollständig' : 'Tag bestätigt', sc.filled * XP_PER_CHECK + (bonus ? XP_DAY_COMPLETE : 0))
+    toast(sc.total > 0 && sc.filled === sc.total ? 'Tag vollständig' : 'Tag bestätigt')
   }
 
   function unconfirmDay() {
@@ -598,8 +583,8 @@ function Insights({ state }: { state: AppState }) {
             Ab <b>{MIN_DAYS} erfassten Tagen</b> sucht OTAAT selbstständig nach Zusammenhängen
             zwischen deinen Checks. Noch {MIN_DAYS - days} {MIN_DAYS - days === 1 ? 'Tag' : 'Tage'}.
           </span>
-          <div className="xp-track">
-            <div className="xp-fill" style={{ width: `${(days / MIN_DAYS) * 100}%` }} />
+          <div className="meter">
+            <div className="meter-fill" style={{ width: `${(days / MIN_DAYS) * 100}%` }} />
           </div>
           <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{days}/{MIN_DAYS}</span>
         </div>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 
-export interface Toast { id: number; text: string; xp?: number }
+export interface Toast { id: number; text: string }
 
 let push: ((t: Omit<Toast, 'id'>) => void) | null = null
 let seq = 0
 
 /** Von ueberall aufrufbar, ohne Context-Gefrickel. */
-export const toast = (text: string, xp?: number) => push?.({ text, xp })
+export const toast = (text: string) => push?.({ text })
 
 export function Toasts() {
   const [items, setItems] = useState<Toast[]>([])
@@ -26,7 +26,6 @@ export function Toasts() {
       {items.map((t) => (
         <div className="toast" key={t.id}>
           {t.text}
-          {t.xp ? <b>+{t.xp} XP</b> : null}
         </div>
       ))}
     </div>

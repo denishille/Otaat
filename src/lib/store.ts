@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 7
+const STATE_VERSION = 8
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -17,7 +17,7 @@ export const emptyState = (): AppState => ({
   nodes: [],
   frames: [],
   edges: [],
-  meta: { xp: 0, theme: 'system', dismissedPresets: [], v: STATE_VERSION, boards: [{ ...FIRST_BOARD }], activeBoard: FIRST_BOARD.id },
+  meta: { theme: 'system', dismissedPresets: [], v: STATE_VERSION, boards: [{ ...FIRST_BOARD }], activeBoard: FIRST_BOARD.id },
 })
 
 export type SyncStatus = 'local' | 'signed-out' | 'syncing' | 'synced' | 'error'
@@ -147,13 +147,19 @@ export function migrate(s: AppState): AppState {
   for (const e of s.edges) e.board ??= first
   if (!s.meta.boards.some((b) => b.id === s.meta.activeBoard)) s.meta.activeBoard = first
 
+  // XP und Level sind raus. Die alten Felder bleiben nicht als Leichen liegen.
+  delete (s.meta as { xp?: number }).xp
+  for (const day of Object.values(s.days)) {
+    delete (day as { paid?: boolean }).paid
+    delete (day as { awarded?: string[] }).awarded
+  }
+
   const externalIds = new Set(DEFAULT_CHECKS.filter((c) => c.kind === 'external').map((c) => c.id))
   for (const day of Object.values(s.days)) {
     if (day.confirmed === undefined) {
       day.confirmed = Object.entries(day.values).some(
         ([id, v]) => !externalIds.has(id) && v !== undefined && v !== null && v !== '',
       )
-      if (day.confirmed) day.paid = true
     }
   }
 
@@ -374,9 +380,3 @@ export async function signOut() {
 
 export const uid = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-
-export function awardXp(n: number) {
-  update((d) => {
-    d.meta.xp = Math.max(0, d.meta.xp + n)
-  })
-}
