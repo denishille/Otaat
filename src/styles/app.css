@@ -297,12 +297,14 @@ h2.section-title {
 .choice button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
 /* Statistik einer Kategorie */
+/* Flex statt Grid: die Kacheln der letzten Zeile ziehen sich auf die volle
+   Breite. Ein Raster liesse je nach Anzahl eine graue Luecke stehen. */
 .stat-row {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  display: flex; flex-wrap: wrap;
   gap: 1px; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
 }
-.stat-tile { background: var(--surface); padding: 13px 15px; }
+.stat-tile { flex: 1 1 104px; background: var(--surface); padding: 13px 15px; }
 .stat-tile-v {
   font-family: var(--display); font-weight: 600; font-size: 23px;
   letter-spacing: -.02em; margin-top: 2px;
@@ -337,6 +339,12 @@ h2.section-title {
 }
 .chart-bar:hover { opacity: .7; }
 .chart-bar--empty { background: var(--line-strong); border-radius: 2px; }
+/* Der gegriffene Tag: Tinte statt Kobalt, damit er sich aus der Reihe loest,
+   ohne eine zweite Bedeutung einzufuehren. */
+.chart-bar--pick { background: var(--ink); }
+/* Gegriffen wird auf der ganzen Flaeche. Senkrecht darf die Seite weiter
+   scrollen, waagerecht faehrt der Finger den Verlauf ab. */
+.chart-plot--pick { touch-action: pan-y; cursor: crosshair; }
 
 .chart-legend { display: flex; gap: 10px; }
 .chart-legend span {
@@ -346,278 +354,16 @@ h2.section-title {
 }
 .chart-legend b { font-size: 11px; font-weight: 500; color: var(--ink-3); }
 
-/* Die Ziellinie ist Beiwerk, keine zweite Datenreihe — deshalb Textfarbe. */
-.chart-target {
-  position: absolute; left: 0; right: 0; height: 0;
-  border-top: 1px dashed var(--ink-4);
-  pointer-events: none;
-}
-.chart-target span {
-  position: absolute; right: 0; top: -15px;
-  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
-  background: var(--surface); padding: 0 4px;
-}
-
 .chart-axis {
   display: flex; justify-content: space-between;
   font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  min-height: 15px;
 }
-
-/* Reihenfolge aendern */
-.grip {
-  display: grid; place-items: center;
-  width: 22px; height: 22px; margin: -3px -5px -3px 0;
-  color: var(--ink-4); font-size: 15px;
-  border-radius: 6px;
-  cursor: grab;
-  /* Der Browser darf den Griff nicht zum Scrollen benutzen. */
-  touch-action: none;
+.chart-pick { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.chart-pick b {
+  font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink);
 }
-.grip:hover { color: var(--ink-2); background: var(--paper-sunk); }
-.grip:active { cursor: grabbing; }
-
-.check--moving {
-  opacity: .35;
-  border-style: dashed;
-  box-shadow: none;
-}
-
-.drag-ghost {
-  position: fixed; z-index: 70;
-  transform: translate(-50%, -160%);
-  padding: 8px 15px; border-radius: var(--r-pill);
-  background: var(--ink); color: var(--paper);
-  font-size: 13.5px; font-weight: 600;
-  box-shadow: var(--shadow-3);
-  pointer-events: none; white-space: nowrap;
-}
-
-/* Gelesene Rubrik: zeigt an, statt abzufragen. */
-.ext { display: flex; flex-direction: column; gap: 7px; }
-.ext-row { display: flex; align-items: baseline; gap: 6px; }
-.ext-value {
-  font-family: var(--display); font-weight: 600; font-size: 31px;
-  letter-spacing: -.02em; line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.ext-target { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
-.ext-note {
-  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
-  text-transform: uppercase; letter-spacing: .09em;
-}
-.ext--empty {
-  font-size: 13px; color: var(--ink-3);
-  padding: 10px 0;
-}
-
-/* Mehrfachauswahl */
-.multi { display: flex; flex-wrap: wrap; gap: 6px; }
-.multi button {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 11px; border-radius: var(--r-pill);
-  border: 1px solid var(--line-strong); font-size: 12.5px; font-weight: 500;
-  color: var(--ink-3); transition: all .13s;
-}
-.multi button:hover { border-color: var(--ink-3); color: var(--ink); }
-.multi button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
-.multi button.none[aria-pressed='true'] { background: var(--ink-3); border-color: var(--ink-3); }
-.multi .addopt {
-  width: 28px; padding: 0; justify-content: center;
-  border-style: dashed; color: var(--ink-4);
-}
-.multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
-/* Das Plus legt an, der Stift raeumt auf — zwei gleich aussehende
-   gestrichelte Kreise waren nicht auseinanderzuhalten. */
-.multi .editopt {
-  width: 28px; padding: 0; justify-content: center;
-  border: 1px solid var(--line-strong); border-radius: var(--r-pill);
-  background: var(--paper-sunk); color: var(--ink-3);
-}
-.multi .editopt:hover { color: var(--ink); border-color: var(--ink-3); }
-.multi .editopt--on {
-  background: var(--ink); border-color: var(--ink); color: var(--paper);
-}
-.multi .editopt--on:hover { color: var(--paper); border-color: var(--ink); }
-
-/* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
-   sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
-.multi-slot { position: relative; display: inline-flex; }
-.multi--managing .multi-slot > button:not(.multi-x) { opacity: .7; }
-.multi--managing .multi-slot > button[disabled] { pointer-events: none; }
-
-/* `.multi .multi-x` statt `.multi-x`: sonst gewinnt `.multi button` mit
-   seiner hoeheren Spezifitaet und der Kreis bleibt ein Oval. */
-.multi .multi-x {
-  position: absolute; top: -5px; right: -5px;
-  /* Padding und Rahmen der Options-Chips zuruecknehmen, sonst wird aus dem
-     Kreis ein Oval. */
-  width: 17px; height: 17px; min-width: 0; padding: 0; border: 0;
-  border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--signal); color: #fff;
-  font-size: 10px; line-height: 1;
-  box-shadow: 0 0 0 2px var(--surface);
-  transition: transform .12s;
-}
-.multi .multi-x:hover { transform: scale(1.15); }
-.multi input {
-  width: 108px; padding: 5px 10px; border-radius: var(--r-pill);
-  border: 1px solid var(--cobalt); background: var(--surface);
-  font-size: 12.5px; outline: none;
-}
-
-/* Text */
-.check .textarea { min-height: 62px; font-size: 13.5px; }
-
-/* Goal contributions */
-.contrib {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding-top: 11px; border-top: 1px dashed var(--line);
-  font-size: 11.5px; color: var(--ink-3);
-}
-.contrib-tag {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: var(--r-pill);
-  background: var(--paper-sunk); font-weight: 550; color: var(--ink-2);
-}
-.contrib-dot { width: 6px; height: 6px; border-radius: 50%; }
-
-/* Day summary */
-.daysum {
-  /* Zwei Spalten, immer nebeneinander — auch auf dem Handy. */
-  display: grid; grid-template-columns: 1fr 1fr;
-  width: fit-content; max-width: 100%; min-width: min(300px, 100%);
-  gap: 1px; background: var(--line);
-  border: 1px solid var(--line); border-radius: var(--r-lg);
-  overflow: hidden; margin-bottom: 28px;
-}
-.daysum-cell { background: var(--surface); padding: 16px 18px; }
-.daysum-k { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); }
-.daysum-v { font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: -.02em; line-height: 1.15; margin-top: 3px; }
-.daysum-v small { font-family: var(--sans); font-size: 13px; color: var(--ink-3); font-weight: 500; }
-
-/* Tagesabschluss */
-.confirm {
-  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-  margin-top: 20px; padding: 16px 20px;
-  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
-  background: var(--surface); box-shadow: var(--shadow-1);
-}
-.confirm-text { flex: 1 1 260px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
-.confirm-text b { color: var(--ink); font-weight: 600; }
-.confirm .btn--primary { flex-shrink: 0; }
-
-.confirm--done {
-  border-style: dashed; border-color: var(--good);
-  background: var(--good-wash); box-shadow: none;
-}
-.confirm--done .confirm-text b { color: var(--good); }
-
-/* Zusammenhaenge */
-.insights { margin-bottom: 28px; }
-
-.insights-head {
-  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.insights-note { font-size: 12.5px; color: var(--ink-3); }
-
-.insight {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px;
-  padding: 13px 18px;
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--surface); box-shadow: var(--shadow-1);
-}
-.insight + .insight { margin-top: 8px; }
-.insight-text { font-size: 14px; line-height: 1.45; }
-.insight-text b { font-weight: 650; }
-.insight-meta {
-  display: flex; align-items: center; gap: 10px;
-  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
-  white-space: nowrap;
-}
-
-/* Staerke als Balken, Richtung als Farbe */
-.insight-bar { width: 52px; height: 5px; border-radius: 3px; background: var(--paper-sunk); overflow: hidden; }
-.insight-bar i { display: block; height: 100%; border-radius: 3px; }
-.insight-bar--up i { background: var(--cobalt); }
-.insight-bar--down i { background: var(--signal); }
-
-.insights-progress {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 15px 18px; border: 1px dashed var(--line-strong);
-  border-radius: var(--r-md); color: var(--ink-2); font-size: 13.5px;
-  line-height: 1.5;
-}
-.insights-progress > span:first-child { flex: 1 1 260px; min-width: 0; }
-.insights-progress .meter { width: 120px; flex-shrink: 0; }
-
-/* Statistik einer Kategorie */
-.stat-row {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 1px; background: var(--line);
-  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
-}
-.stat-tile { background: var(--surface); padding: 13px 15px; }
-.stat-tile-v {
-  font-family: var(--display); font-weight: 600; font-size: 23px;
-  letter-spacing: -.02em; margin-top: 2px;
-}
-.stat-tile-v small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); }
-
-.chart-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
-}
-.chart-head h4 {
-  margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px;
-  letter-spacing: -.015em;
-}
-.chart-note { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
-
-.chart { display: flex; flex-direction: column; gap: 8px; }
-.chart-plot {
-  position: relative;
-  display: flex; align-items: flex-end; gap: 2px;
-  height: 120px; padding: 0 2px;
-  border-bottom: 1px solid var(--line-strong);
-}
-.chart-plot--wide { gap: 10px; height: 130px; }
-
-/* Ein Balken je Tag: schmal, mit abgerundetem Kopf, auf der Grundlinie sitzend. */
-.chart-bar {
-  flex: 1; min-width: 3px;
-  background: var(--cobalt);
-  border-radius: 4px 4px 0 0;
-  transition: opacity .12s;
-}
-.chart-bar:hover { opacity: .7; }
-.chart-bar--empty { background: var(--line-strong); border-radius: 2px; }
-
-.chart-legend { display: flex; gap: 10px; }
-.chart-legend span {
-  flex: 1; display: flex; flex-direction: column; gap: 1px;
-  text-align: center;
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
-}
-.chart-legend b { font-size: 11px; font-weight: 500; color: var(--ink-3); }
-
-/* Die Ziellinie ist Beiwerk, keine zweite Datenreihe — deshalb Textfarbe. */
-.chart-target {
-  position: absolute; left: 0; right: 0; height: 0;
-  border-top: 1px dashed var(--ink-4);
-  pointer-events: none;
-}
-.chart-target span {
-  position: absolute; right: 0; top: -15px;
-  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
-  background: var(--surface); padding: 0 4px;
-}
-
-.chart-axis {
-  display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
-}
+.chart-pick > span:first-of-type { font-size: 11.5px; color: var(--ink-2); }
 
 /* Reihenfolge aendern */
 .grip {

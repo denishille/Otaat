@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { AppState, CheckDef } from '../lib/types'
 import { byWeekday, fmt, series, summarize, type Point } from '../lib/stats'
-import { checkStreak } from '../lib/scoring'
 import { findInsights, loggedDays, MIN_DAYS, strengthLabel } from '../lib/insights'
-import { shortDate } from '../lib/dates'
+import { longDate, shortDate } from '../lib/dates'
 import { Sheet } from '../components/Sheet'
 
 const RANGES = [30, 60, 90] as const
@@ -21,16 +20,10 @@ export function CheckStats({
   const points = useMemo(() => series(state, def, days), [state, def, days])
   const sum = useMemo(() => summarize(def, points), [def, points])
   const week = useMemo(() => byWeekday(points), [points])
-  const run = checkStreak(state, def)
-
   const related = useMemo(() => {
     if (loggedDays(state) < MIN_DAYS) return []
     return findInsights(state).filter((i) => i.a.id === def.id || i.b.id === def.id).slice(0, 4)
   }, [state, def])
-
-  const goals = (def.goals ?? [])
-    .map((g) => state.nodes.find((n) => n.id === g))
-    .filter(Boolean)
 
   return (
     <Sheet
@@ -44,11 +37,13 @@ export function CheckStats({
         </>
       }
     >
+      {/* Nur Beschreibendes. Serie und "Ziel getroffen" haengen beide am
+          Zielwert und sind hier raus. */}
       <div className="stat-row">
         <Tile k="Schnitt" v={fmt(def, sum.avg, sum.isRate)} />
-        <Tile k="Ziel getroffen" v={`${sum.metDays}`} sub={`von ${days} Tagen`} />
-        <Tile k="Serie" v={String(run)} sub={run === 1 ? 'Tag' : 'Tage'} />
-        <Tile k="Längste Serie" v={String(sum.bestRun)} sub={sum.bestRun === 1 ? 'Tag' : 'Tage'} />
+        {!sum.isRate && <Tile k="Höchstwert" v={fmt(def, sum.max)} />}
+        {!sum.isRate && <Tile k="Tiefstwert" v={fmt(def, sum.min)} />}
+        <Tile k="Erfasst" v={String(sum.n)} sub={`von ${days}`} />
       </div>
 
       <section>
@@ -62,7 +57,7 @@ export function CheckStats({
         </div>
         {sum.n === 0
           ? <div className="empty"><strong>Noch nichts erfasst.</strong>Trag den Check ein paar Tage ein, dann steht hier ein Verlauf.</div>
-          : <Trend def={def} points={points} rate={sum.isRate} />}
+          : <Trend def={def} points={points} rate={sum.isRate} avg={sum.avg} />}
       </section>
 
       {sum.n >= 7 && (
@@ -93,25 +88,6 @@ export function CheckStats({
         </section>
       )}
 
-      <section>
-        <div className="chart-head"><h4>Zahlt ein auf</h4></div>
-        {goals.length === 0 ? (
-          <p className="chart-note" style={{ margin: 0 }}>
-            Noch auf kein Ziel. Auf <b>Mind my Business</b> einen Eintrag auswählen und
-            in der Leiste unten <b>Als Ziel</b> antippen — danach lässt er sich hier
-            über <b>Bearbeiten</b> mit diesem Check verbinden.
-          </p>
-        ) : (
-          <div className="choice">
-            {goals.map((g) => (
-              <span className="chip" key={g!.id}>
-                <i className="contrib-dot" style={{ background: `var(--n-${g!.color})` }} />
-                {g!.text || 'Unbenanntes Ziel'}
-              </span>
-            ))}
-          </div>
-        )}
-      </section>
     </Sheet>
   )
 }
@@ -128,37 +104,71 @@ function Tile({ k, v, sub }: { k: string; v: string; sub?: string }) {
 /* ---------------------------------------------------------------- */
 
 /** Ein Balken je Tag. Fehlende Tage bleiben leer statt interpoliert zu werden. */
-function Trend({ def, points, rate }: { def: CheckDef; points: Point[]; rate: boolean }) {
+function Trend({ def, points, rate, avg }: { def: CheckDef; points: Point[]; rate: boolean; avg: number | null }) {
   const vals = points.map((p) => p.value).filter((v): v is number => v !== null)
-  const top = Math.max(...vals, def.target ?? 0, rate ? 1 : 0) || 1
+  const top = Math.max(...vals, rate ? 1 : 0) || 1
+
+  /**
+   * Bei 90 Tagen ist ein Balken drei Pixel breit — zu schmal, um ihn zu
+   * treffen. Gegriffen wird deshalb auf der ganzen Flaeche: die x-Position
+   * bestimmt den Tag, und Ziehen faehrt den Verlauf ab. Der `title`-Text
+   * bleibt fuer die Maus, auf dem Handy gibt es ihn nicht.
+   */
+  const plotRef = useRef<HTMLDivElement>(null)
+  const [pick, setPick] = useState<string | null>(null)
+  const sel = pick ? points.find((p) => p.date === pick) ?? null : null
+
+  const pickAt = (clientX: number) => {
+    const r = plotRef.current?.getBoundingClientRect()
+    if (!r || !points.length) return
+    const i = Math.floor(((clientX - r.left) / r.width) * points.length)
+    setPick(points[Math.max(0, Math.min(points.length - 1, i))].date)
+  }
 
   return (
     <div className="chart">
-      <div className="chart-plot">
-        {def.target !== undefined && !rate && (
-          <div
-            className="chart-target"
-            style={{ bottom: `${(def.target / top) * 100}%` }}
-            aria-hidden="true"
-          >
-            <span>{def.inverse ? 'höchstens' : 'mindestens'} {def.target}</span>
-          </div>
-        )}
+      <div
+        className="chart-plot chart-plot--pick"
+        ref={plotRef}
+        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); pickAt(e.clientX) }}
+        onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) pickAt(e.clientX) }}
+        onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
+      >
         {points.map((p) => (
           <div
             key={p.date}
-            className={'chart-bar' + (p.value === null ? ' chart-bar--empty' : '')}
+            className={'chart-bar' + (p.value === null ? ' chart-bar--empty' : '') + (p.date === pick ? ' chart-bar--pick' : '')}
             style={{ height: p.value === null ? '2px' : `max(3px, ${(p.value / top) * 100}%)` }}
             title={`${shortDate(p.date)} — ${p.value === null ? 'nichts erfasst' : fmt(def, p.value, rate)}`}
           />
         ))}
       </div>
+      {/* Dieselbe Zeile traegt entweder den Zeitraum oder den gegriffenen Tag —
+          so springt beim Antippen nichts. */}
       <div className="chart-axis">
-        <span>{shortDate(points[0].date)}</span>
-        <span>{shortDate(points[points.length - 1].date)}</span>
+        {sel ? (
+          <span className="chart-pick">
+            <b>{longDate(sel.date)}</b>
+            <span>{sel.value === null ? 'nichts erfasst' : fmt(def, sel.value, rate)}</span>
+            {sel.value !== null && avg !== null && <span>{compare(def, sel.value, avg, rate)}</span>}
+          </span>
+        ) : (
+          <>
+            <span>{shortDate(points[0].date)}</span>
+            <span>{shortDate(points[points.length - 1].date)}</span>
+          </>
+        )}
       </div>
     </div>
   )
+}
+
+/** Wie der Tag zum eigenen Schnitt steht. Ohne Wertung, nur die Richtung. */
+function compare(def: CheckDef, value: number, avg: number, rate: boolean): string {
+  const d = value - avg
+  const step = rate ? 0.005 : 0.05
+  if (Math.abs(d) < step) return 'im Schnitt'
+  return `${fmt(def, Math.abs(d), rate)} ${d > 0 ? 'über' : 'unter'} Schnitt`
 }
 
 function Weekdays({ def, week, rate }: { def: CheckDef; week: ReturnType<typeof byWeekday>; rate: boolean }) {

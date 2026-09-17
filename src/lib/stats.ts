@@ -78,6 +78,7 @@ export function byWeekday(points: Point[]): WeekdayStat[] {
 export function fmt(def: CheckDef, v: number | null, rate = false): string {
   if (v === null) return '–'
   if (rate) return `${Math.round(v * 100)} %`
-  const rounded = Math.round(v * 10) / 10
-  return def.unit ? `${rounded} ${def.unit}` : String(rounded)
+  // Deutsches Komma — die App spricht sonst auch deutsch.
+  const rounded = String(Math.round(v * 10) / 10).replace('.', ',')
+  return def.unit ? `${rounded} ${def.unit}` : rounded
 }
