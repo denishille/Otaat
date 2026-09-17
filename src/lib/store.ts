@@ -26,20 +26,26 @@ export type SyncStatus = 'local' | 'signed-out' | 'syncing' | 'synced' | 'error'
 let state: AppState = emptyState()
 let status: SyncStatus = cloudEnabled ? 'signed-out' : 'local'
 let userId: string | null = null
+let email: string | null = null
+/** Name, unter dem andere einen finden. Steht in `otaat_profiles`, nicht im
+    State — das ist Konto, nicht App. */
+let username: string | null = null
 let lastError: string | null = null
 
 export interface Snapshot {
   state: AppState
   status: SyncStatus
   userId: string | null
+  email: string | null
+  username: string | null
   lastError: string | null
 }
 
 const listeners = new Set<() => void>()
-let snapshot: Snapshot = { state, status, userId, lastError }
+let snapshot: Snapshot = { state, status, userId, email, username, lastError }
 
 function emit() {
-  snapshot = { state, status, userId, lastError }
+  snapshot = { state, status, userId, email, username, lastError }
   listeners.forEach((l) => l())
 }
 
@@ -380,10 +386,12 @@ export async function pullAll() {
       supabase.from(T.nodes).select('payload'),
       supabase.from(T.frames).select('payload'),
       supabase.from(T.edges).select('payload'),
-      supabase.from(T.profiles).select('meta').eq('id', userId).maybeSingle(),
+      supabase.from(T.profiles).select('meta, username').eq('id', userId).maybeSingle(),
     ])
     const err = [checks, days, reminders, nodes, frames, edges, profile].find((r) => r.error)?.error
     if (err) throw err
+
+    username = (profile.data?.username as string | null) ?? null
 
     const remote: AppState = {
       checks: (checks.data ?? []).map((r) => r.payload as CheckDef),
@@ -482,6 +490,7 @@ export function initAuth() {
   if (!supabase) return
   supabase.auth.getSession().then(({ data }) => {
     userId = data.session?.user.id ?? null
+    email = data.session?.user.email ?? null
     status = userId ? 'syncing' : 'signed-out'
     emit()
     if (userId) void pullAll()
@@ -490,6 +499,8 @@ export function initAuth() {
     const next = session?.user.id ?? null
     if (next === userId) return
     userId = next
+    email = session?.user.email ?? null
+    if (!next) username = null
     forgetPushed()
     if (userId) {
       status = 'syncing'
@@ -522,6 +533,22 @@ export async function calendarFeedUrl(): Promise<string | null> {
 
 export async function signOut() {
   await supabase?.auth.signOut()
+}
+
+/**
+ * Den eigenen Namen setzen. Eindeutig ueber alle Konten — der Fehler aus der
+ * Datenbank wird durchgereicht, damit "schon vergeben" auch so ankommt.
+ */
+export async function setUsername(name: string): Promise<void> {
+  if (!supabase || !userId) throw new Error('Nicht angemeldet')
+  const clean = name.trim()
+  if (!/^[A-Za-z0-9_.-]{3,24}$/.test(clean)) {
+    throw new Error('3 bis 24 Zeichen, Buchstaben, Ziffern, Punkt, Strich, Unterstrich.')
+  }
+  const { error } = await supabase.from(T.profiles).update({ username: clean }).eq('id', userId)
+  if (error) throw new Error(error.code === '23505' ? 'Der Name ist schon vergeben.' : error.message)
+  username = clean
+  emit()
 }
 
 /* ------------------------------------------------------------------ */

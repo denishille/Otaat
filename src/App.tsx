@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll } from './lib/store'
+import { useStore, update, applyTheme, resolvedTheme, signIn, signOut, pushAll, setUsername, type SyncStatus } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
 import { Today } from './views/Today'
 import { FutureMe } from './views/FutureMe'
@@ -92,8 +92,11 @@ export default function App() {
           <button className="iconbtn" onClick={toggleTheme} aria-label="Hell / dunkel">
             {shown === 'dark' ? <Sun /> : <Moon />}
           </button>
+          {/* Der Stand des Abgleichs steht im Blatt. Hier oben nur ein Punkt,
+              wenn etwas klemmt — sonst waere die Leiste eine Statusanzeige. */}
           <button className="btn btn--ghost btn--sm" onClick={() => setAccount(true)}>
-            {!cloudEnabled ? 'Lokal' : userId ? (status === 'error' ? 'Sync-Fehler' : status === 'syncing' ? 'Sync…' : 'Synced') : 'Anmelden'}
+            {cloudEnabled && !userId ? 'Anmelden' : 'Konto'}
+            {status === 'error' && <i className="dot-warn" aria-label="Abgleich klemmt" />}
           </button>
         </div>
       </header>
@@ -112,8 +115,17 @@ export default function App() {
 
 /* ---------------------------------------------------------------- */
 
+/** Der Stand des Abgleichs, auf Deutsch. */
+const STATUS: Record<SyncStatus, string> = {
+  local: 'nur auf diesem Gerät',
+  'signed-out': 'nicht angemeldet',
+  syncing: 'synchronisiert …',
+  synced: 'synchronisiert',
+  error: 'Fehler',
+}
+
 function Account({ onClose }: { onClose: () => void }) {
-  const { state, status, userId, lastError } = useStore()
+  const { state, status, userId, email: userEmail, username, lastError } = useStore()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -158,11 +170,23 @@ function Account({ onClose }: { onClose: () => void }) {
           setzen.
         </p>
       ) : userId ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 14, color: 'var(--ink-2)' }}>
-            Angemeldet. Status: <b style={{ color: status === 'error' ? 'var(--signal)' : 'var(--ink)' }}>{status}</b>
+            Angemeldet. Status: <b style={{ color: status === 'error' ? 'var(--signal)' : 'var(--ink)' }}>{STATUS[status]}</b>
             {lastError && <div style={{ fontSize: 12.5, color: 'var(--signal)', marginTop: 4 }}>{lastError}</div>}
           </div>
+
+          <div className="acc-rows">
+            <div className="acc-row">
+              <span className="acc-k">Mail</span>
+              <span className="acc-v mono">{userEmail}</span>
+            </div>
+            <div className="acc-row">
+              <span className="acc-k">Name</span>
+              <NameField current={username} />
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn--ghost btn--sm" onClick={() => void pushAll()}>Jetzt synchronisieren</button>
             <button className="btn btn--quiet btn--sm" onClick={() => void signOut()}>Abmelden</button>
@@ -189,6 +213,41 @@ function Account({ onClose }: { onClose: () => void }) {
         <button className="btn btn--ghost btn--sm" onClick={exportJson}>Alles als JSON sichern</button>
       </div>
     </Sheet>
+  )
+}
+
+/**
+ * Der Name, unter dem andere einen finden. Steht auch ohne Teilen schon da —
+ * gebraucht wird er, sobald ein Board zu zweit laufen soll.
+ */
+function NameField({ current }: { current: string | null }) {
+  const [draft, setDraft] = useState(current ?? '')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { setDraft(current ?? '') }, [current])
+
+  const save = async () => {
+    if (draft.trim() === (current ?? '')) return
+    setBusy(true)
+    try {
+      await setUsername(draft)
+      toast('Name gespeichert')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ging nicht')
+      setDraft(current ?? '')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <span className="acc-name">
+      <input
+        className="input" value={draft} placeholder="noch keiner" disabled={busy}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      />
+    </span>
   )
 }
 

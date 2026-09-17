@@ -1170,6 +1170,30 @@ h2.section-title {
 }
 .iconbtn:hover { color: var(--ink); background: var(--paper-sunk); }
 
+/* Konto-Blatt */
+.acc-rows {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.acc-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 14px; min-height: 46px;
+}
+.acc-row + .acc-row { border-top: 1px solid var(--line); }
+.acc-k {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-4); width: 54px; flex-shrink: 0;
+}
+.acc-v { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.acc-name { flex: 1; }
+.acc-name .input { padding: 5px 9px; font-size: 14px; }
+
+/* Ein Punkt am Konto-Knopf, wenn der Abgleich klemmt. */
+.dot-warn {
+  display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  border-radius: 50%; background: var(--signal); vertical-align: middle;
+}
+
 /* ============================ Toast ============================ */
 
 .toasts {
