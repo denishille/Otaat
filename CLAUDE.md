@@ -32,6 +32,7 @@ schlägt bei Typfehlern fehl.
 | `src/lib/store.ts` | Einziger Schreibweg in den State. `update()` klont, mutiert, persistiert. `transient` für Drags, `commit()` schreibt durch. |
 | `src/lib/scoring.ts` | Zielwerte, Serien, Momentum der Board-Ziele. **`countedValues()` ist die Wahrheit**: ein Tag zählt erst als bestätigt, vorher sind die vom Vortag übernommenen Werte nur ein Vorschlag. Gemessene Rubriken (`kind: 'external'`) zählen immer. Statistik, Zusammenhänge und Serien lesen ausschließlich darüber. |
 | `src/data/catalog.ts` | Das Regal — Vorlagen für Future Me Problems |
+| `src/views/Board.tsx` | Mehrere Boards. Knoten, Bereiche und Linien tragen ein `board`-Feld, die Boards selbst liegen in `meta.boards` mit `meta.activeBoard`. Beim Anlegen immer das aktive Board eintragen, sonst taucht der Eintrag nirgends auf. |
 | `src/styles/tokens.css` | Alle Farben. Dark Mode ist eine Umdefinition derselben Variablen. |
 | `supabase/migrations/` | Schema, Indizes, RLS |
 | `src/data/brudi-source.ts` | Quelle der Essens-Rubrik. Liest nur die View `brudi_tag_public` (Datum, Kalorien, Ziel) — nie `tagesuebersicht` direkt, dort stehen Gewicht und Symptome. |

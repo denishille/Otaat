@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from 'react'
-import type { AppState, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
+import type { AppState, Board, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
 import { DEFAULT_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
 
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 6
+const STATE_VERSION = 7
+
+export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
 export const emptyState = (): AppState => ({
   checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
@@ -15,7 +17,7 @@ export const emptyState = (): AppState => ({
   nodes: [],
   frames: [],
   edges: [],
-  meta: { xp: 0, theme: 'system', dismissedPresets: [], v: STATE_VERSION },
+  meta: { xp: 0, theme: 'system', dismissedPresets: [], v: STATE_VERSION, boards: [{ ...FIRST_BOARD }], activeBoard: FIRST_BOARD.id },
 })
 
 export type SyncStatus = 'local' | 'signed-out' | 'syncing' | 'synced' | 'error'
@@ -105,6 +107,10 @@ export function loadLocal() {
     const merged = { ...base, ...parsed, meta: { ...base.meta, ...parsed.meta } }
     // Ein Stand ohne Checks waere eine leere App ohne Weg zurueck.
     if (!merged.checks?.length) merged.checks = base.checks
+    if (!merged.meta.boards?.length) {
+      merged.meta.boards = base.meta.boards
+      merged.meta.activeBoard = base.meta.activeBoard
+    }
     state = migrate(merged)
     applyTheme(state.meta.theme)
     saveLocal()
@@ -130,6 +136,17 @@ export function migrate(s: AppState): AppState {
   // Werte stehen — die 180 Tage Kalorien aus dem Abgleich — werden nicht
   // nachtraeglich zu bestaetigten Tagen, sonst entstuende eine Serie, die es
   // nie gab.
+  // Alles, was bisher auf dem einen Board lag, bekommt dessen Kennung.
+  if (!s.meta.boards?.length) {
+    s.meta.boards = [{ ...FIRST_BOARD }]
+    s.meta.activeBoard = FIRST_BOARD.id
+  }
+  const first = s.meta.boards[0].id
+  for (const n of s.nodes) n.board ??= first
+  for (const f of s.frames) f.board ??= first
+  for (const e of s.edges) e.board ??= first
+  if (!s.meta.boards.some((b) => b.id === s.meta.activeBoard)) s.meta.activeBoard = first
+
   const externalIds = new Set(DEFAULT_CHECKS.filter((c) => c.kind === 'external').map((c) => c.id))
   for (const day of Object.values(s.days)) {
     if (day.confirmed === undefined) {

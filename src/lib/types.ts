@@ -77,8 +77,17 @@ export interface Reminder {
 
 export type NodeColor = 'slate' | 'cobalt' | 'signal' | 'moss' | 'plum' | 'amber'
 
+/** Ein Board ist eine eigene Flaeche. Knoten, Bereiche und Linien gehoeren
+    immer zu genau einem. */
+export interface Board {
+  id: ID
+  name: string
+  createdAt: string
+}
+
 export interface BoardNode {
   id: ID
+  board: ID
   x: number
   y: number
   w: number
@@ -90,6 +99,7 @@ export interface BoardNode {
 
 export interface BoardFrame {
   id: ID
+  board: ID
   x: number
   y: number
   w: number
@@ -100,6 +110,7 @@ export interface BoardFrame {
 
 export interface BoardEdge {
   id: ID
+  board: ID
   from: ID
   to: ID
 }
@@ -116,5 +127,14 @@ export interface AppState {
   nodes: BoardNode[]
   frames: BoardFrame[]
   edges: BoardEdge[]
-  meta: { xp: number; theme: Theme; dismissedPresets: string[]; v?: number }
+  meta: {
+    xp: number
+    theme: Theme
+    dismissedPresets: string[]
+    v?: number
+    /** Die Boards liegen in meta, nicht in einer eigenen Tabelle: es sind
+        wenige, winzige Eintraege, und meta wird ohnehin mitsynchronisiert. */
+    boards: Board[]
+    activeBoard: ID
+  }
 }

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useStore, update, uid, commit } from '../lib/store'
 import type { BoardFrame, BoardNode, NodeColor } from '../lib/types'
 import { goalMomentum } from '../lib/scoring'
-import { ChevR, Link, Plus, Trash } from '../components/Icons'
-import { isTouch } from '../lib/device'
+import { ChevR, Link, Pencil, Plus, Trash } from '../components/Icons'
+import { isTouch, noAutofill } from '../lib/device'
 
 const COLORS: NodeColor[] = ['slate', 'cobalt', 'signal', 'moss', 'plum', 'amber']
 const NODE_W = 208
@@ -41,6 +41,8 @@ export function Board() {
   const [gliding, setGliding] = useState(false)
   const [hotFrame, setHotFrame] = useState<string | null>(null)
   const [indexOpen, setIndexOpen] = useState(!isTouch)
+  const [boardsOpen, setBoardsOpen] = useState(false)
+  const [renaming, setRenaming] = useState<string | null>(null)
   const indexRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
@@ -52,7 +54,10 @@ export function Board() {
   const viewRef = useRef(view)
   viewRef.current = view
 
-  const { nodes, frames, edges } = state
+  const board = state.meta.activeBoard
+  const nodes = state.nodes.filter((n) => n.board === board)
+  const frames = state.frames.filter((f) => f.board === board)
+  const edges = state.edges.filter((e) => e.board === board)
 
   /* ------------------ Koordinaten ------------------ */
 
@@ -78,7 +83,7 @@ export function Board() {
 
   function addNode(x: number, y: number, text = '') {
     const id = uid()
-    update((d) => { d.nodes.push({ id, x: x - NODE_W / 2, y: y - 22, w: NODE_W, text, color: 'slate' }) })
+    update((d) => { d.nodes.push({ id, board, x: x - NODE_W / 2, y: y - 22, w: NODE_W, text, color: 'slate' }) })
     setSel({ kind: 'node', id })
     setEditingId(id)
     return id
@@ -88,7 +93,7 @@ export function Board() {
     const r = wrapRef.current!.getBoundingClientRect()
     const c = toWorld(r.left + r.width / 2, r.top + r.height / 2)
     const id = uid()
-    update((d) => { d.frames.push({ id, x: c.x - 210, y: c.y - 150, w: 420, h: 300, label: 'Neuer Bereich', color: 'slate' }) })
+    update((d) => { d.frames.push({ id, board, x: c.x - 210, y: c.y - 150, w: 420, h: 300, label: 'Neuer Bereich', color: 'slate' }) })
     setSel({ kind: 'frame', id })
   }
 
@@ -290,7 +295,7 @@ export function Board() {
           const exists = edges.some(
             (g) => (g.from === wire.from && g.to === target) || (g.from === target && g.to === wire.from),
           )
-          if (!exists) update((d) => { d.edges.push({ id: uid(), from: wire.from, to: target }) })
+          if (!exists) update((d) => { d.edges.push({ id: uid(), board, from: wire.from, to: target }) })
         }
         setWire(null)
       }
@@ -305,7 +310,7 @@ export function Board() {
           const exists = d.edges.some(
             (g) => (g.from === from && g.to === to) || (g.from === to && g.to === from),
           )
-          if (!exists) d.edges.push({ id: uid(), from, to })
+          if (!exists) d.edges.push({ id: uid(), board, from, to })
         })
         setDropTarget(null)
         setDrag(null)
@@ -429,16 +434,57 @@ export function Board() {
    * saesse schief. Ohne Ueberblendung, sonst faehrt das Board beim Betreten
    * sichtbar durch die Gegend.
    */
-  const didFit = useRef(false)
+  const didFit = useRef<string | null>(null)
   useLayoutEffect(() => {
-    if (didFit.current) return
-    if (nodes.length === 0 && frames.length === 0) return
+    if (didFit.current === board) return
+    if (nodes.length === 0 && frames.length === 0) {
+      // Leeres Board: Ausgangslage statt des Ausschnitts vom vorigen.
+      if (didFit.current !== board) { didFit.current = board; setView({ x: 120, y: 120, z: 1 }); setSel(null) }
+      return
+    }
     if (nodes.some((n) => !sizes[n.id])) return
-    didFit.current = true
+    didFit.current = board
     const e = everything()
     if (e) glideTo(e.x, e.y, e.w, e.h, { instant: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, frames, sizes])
+  }, [board, nodes, frames, sizes])
+
+  function addBoard() {
+    const id = uid()
+    update((d) => {
+      d.meta.boards.push({ id, name: `Board ${d.meta.boards.length + 1}`, createdAt: new Date().toISOString() })
+      d.meta.activeBoard = id
+    })
+    setRenaming(id)
+    setSel(null)
+  }
+
+  function switchBoard(id: string) {
+    update((d) => { d.meta.activeBoard = id })
+    setSel(null)
+    if (isTouch) setBoardsOpen(false)
+  }
+
+  function renameBoard(id: string, name: string) {
+    const clean = name.trim()
+    update((d) => {
+      const b = d.meta.boards.find((x) => x.id === id)
+      if (b && clean) b.name = clean
+    })
+  }
+
+  /** Ein Board mitsamt allem darauf. Nie das letzte. */
+  function removeBoard(id: string) {
+    update((d) => {
+      if (d.meta.boards.length < 2) return
+      d.meta.boards = d.meta.boards.filter((b) => b.id !== id)
+      d.nodes = d.nodes.filter((n) => n.board !== id)
+      d.frames = d.frames.filter((f) => f.board !== id)
+      d.edges = d.edges.filter((e) => e.board !== id)
+      if (d.meta.activeBoard === id) d.meta.activeBoard = d.meta.boards[0].id
+    })
+    setSel(null)
+  }
 
   /** Umfassendes Rechteck ueber alles, was auf dem Board liegt. */
   function everything() {
@@ -611,11 +657,13 @@ export function Board() {
         <div className="eyebrow" style={{ background: 'color-mix(in srgb, var(--surface) 80%, transparent)', padding: '6px 11px', borderRadius: 999, backdropFilter: 'blur(6px)' }}>
           Mind my Business
         </div>
-        {/* Solange nichts da ist, hilft der Hinweis mehr als ein leeres
-            Verzeichnis. Sobald etwas liegt, tauschen die beiden die Plaetze. */}
-        {nodes.length === 0 && frames.length === 0 ? (
+        {/* Der Hinweis kommt zum Verzeichnis dazu, er ersetzt es nicht: sonst
+            verschwindet auf einem leeren Board auch der Board-Schalter, und
+            man kommt nicht mehr zurueck. */}
+        {nodes.length === 0 && frames.length === 0 && (
           <div className="board-hint">Irgendwo hinklicken und losschreiben</div>
-        ) : (
+        )}
+        <div className="board-panels">
           <div className={'board-index' + (indexOpen ? '' : ' board-index--shut')} ref={indexRef}>
             <button className="board-index-head" onClick={() => setIndexOpen((o) => !o)}>
               <span>Bereiche</span>
@@ -686,7 +734,68 @@ export function Board() {
               </div>
             )}
           </div>
-        )}
+
+          <div className={'board-index board-switch' + (boardsOpen ? '' : ' board-index--shut')}>
+            <button className="board-index-head" onClick={() => setBoardsOpen((o) => !o)}>
+              <span>Boards</span>
+              <span className="mono">{state.meta.boards.length}</span>
+              <ChevR className={'board-index-caret' + (boardsOpen ? ' board-index-caret--open' : '')} />
+            </button>
+
+            {boardsOpen ? (
+              <div className="board-index-list">
+                {state.meta.boards.map((bd) => {
+                  const count = state.nodes.filter((n) => n.board === bd.id).length
+                  const active = bd.id === board
+                  return (
+                    <div key={bd.id} className={'board-row' + (active ? ' board-row--on' : '')}>
+                      {renaming === bd.id ? (
+                        <input
+                          className="board-rename"
+                          defaultValue={bd.name}
+                          autoFocus
+                          // Beim Anlegen steht "Board 2" drin — tippen soll
+                          // das ersetzen, nicht daran haengen.
+                          onFocus={(e) => e.target.select()}
+                          {...noAutofill}
+                          onBlur={(e) => { renameBoard(bd.id, e.target.value); setRenaming(null) }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            if (e.key === 'Escape') setRenaming(null)
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <button className="board-row-name" onClick={() => switchBoard(bd.id)}>
+                            {bd.name}
+                          </button>
+                          <span className="mono">{count}</span>
+                          <button className="board-row-act" onClick={() => setRenaming(bd.id)} aria-label="Umbenennen" title="Umbenennen">
+                            <Pencil />
+                          </button>
+                          {state.meta.boards.length > 1 && (
+                            <button
+                              className="board-row-act board-row-act--drop"
+                              onClick={() => removeBoard(bd.id)}
+                              aria-label="Board löschen" title="Board mitsamt Inhalt löschen"
+                            >
+                              <Trash />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+                <button className="board-index-row board-index-row--all" onClick={addBoard}>
+                  <Plus /> Neues Board
+                </button>
+              </div>
+            ) : (
+              <div className="board-switch-current">{state.meta.boards.find((bd) => bd.id === board)?.name}</div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="board-toolbar" ref={toolbarRef}>
