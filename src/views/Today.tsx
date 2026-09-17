@@ -313,10 +313,21 @@ interface CardProps {
 function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
   const filled = isFilled(value)
 
+  /**
+   * Die ganze Kachel oeffnet die Statistik — der Name allein waere auf dem
+   * Handy ein 50 px breites Ziel. Alles, womit man den Wert eintraegt, behaelt
+   * seinen eigenen Klick: Knoepfe, Felder, der Griff zum Verschieben.
+   */
+  const openFromCard = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, textarea, select, label, a')) return
+    onOpen()
+  }
+
   return (
     <div
       ref={cardRef}
       className={'check' + (filled ? ' check--filled' : '') + (dragging ? ' check--moving' : '')}
+      onClick={openFromCard}
     >
       <div className="check-top">
         <button onClick={onOpen} className="check-name" style={{ textAlign: 'left' }} title="Statistik ansehen">{def.name}</button>

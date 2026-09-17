@@ -227,7 +227,11 @@ h2.section-title {
   transition: border-color .18s, box-shadow .18s, transform .18s;
   display: flex; flex-direction: column; gap: 13px;
   min-height: 118px;
+  /* Die ganze Kachel oeffnet die Statistik; die Eingaben behalten ihren
+     eigenen Zeiger. */
+  cursor: pointer;
 }
+.check input, .check textarea { cursor: auto; }
 .check:hover { box-shadow: var(--shadow-2); }
 .check--filled { border-color: var(--line-strong); }
 .check--filled::before {
