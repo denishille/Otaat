@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid, calendarFeedUrl } from '../lib/store'
 import type { Cadence, Reminder } from '../lib/types'
 import { CATALOG, CATALOG_BY_CATEGORY, CATEGORIES, type Preset } from '../data/catalog'
-import { addDays, addMonths, advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
+import { addDays, addMonths, advance, cadenceLabel, daysBetween, fromISO, longDate, relativeDue, shortDate, toISO, today } from '../lib/dates'
 import { downloadICS } from '../lib/ics'
-import { Cal, Check, ChevR, Pencil, Plus, Trash, X } from '../components/Icons'
+import { Cal, Check, ChevL, ChevR, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
@@ -372,18 +372,144 @@ function ResetSheet({ scope, onClose }: { scope: string | null; onClose: () => v
   )
 }
 
+/**
+ * Alle Termine eines Eintrags zwischen `from` und `to`.
+ *
+ * `due` ist nur der naechste. Fuer einen Monatsueberblick muss der Rhythmus
+ * weitergerechnet werden — eine woechentliche Sache steht vier Mal im Monat.
+ * Der Zaehler ist eine Bremse gegen kaputte Rhythmen, nicht Teil der Logik.
+ */
+function occurrences(r: Reminder, from: string, to: string): string[] {
+  if (r.done) return []
+  if (r.cadence.type === 'once') return r.due >= from && r.due <= to ? [r.due] : []
+  const out: string[] = []
+  let d = r.due
+  let guard = 0
+  while (d < from && guard++ < 500) d = advance(d, r.cadence)
+  while (d <= to && guard++ < 500) {
+    out.push(d)
+    d = advance(d, r.cadence)
+  }
+  return out
+}
+
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
+  'August', 'September', 'Oktober', 'November', 'Dezember']
+
+/** Monatsraster, montags beginnend. Fuehrende und nachlaufende Tage bleiben leer. */
+function monthGrid(anchor: string): (string | null)[] {
+  const d = fromISO(anchor)
+  const first = new Date(d.getFullYear(), d.getMonth(), 1)
+  const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  const lead = (first.getDay() + 6) % 7
+  const cells: (string | null)[] = Array.from({ length: lead }, () => null)
+  for (let i = 1; i <= days; i++) cells.push(toISO(new Date(d.getFullYear(), d.getMonth(), i)))
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
 function CalendarSheet({ onClose }: { onClose: () => void }) {
   const { state, userId } = useStore()
   const [url, setUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const now = today()
+  const [anchor, setAnchor] = useState(now)
+  const [pick, setPick] = useState<string | null>(now)
 
   useEffect(() => { void calendarFeedUrl().then(setUrl) }, [userId])
 
   const webcal = url?.replace(/^https?:/, 'webcal:')
 
+  const cells = useMemo(() => monthGrid(anchor), [anchor])
+  const span = useMemo(() => {
+    const real = cells.filter((c): c is string => c !== null)
+    return { from: real[0], to: real[real.length - 1] }
+  }, [cells])
+
+  /** Tag -> die Eintraege, die an dem Tag anstehen. */
+  const byDay = useMemo(() => {
+    const map = new Map<string, Reminder[]>()
+    for (const r of state.reminders) {
+      for (const d of occurrences(r, span.from, span.to)) {
+        const list = map.get(d)
+        if (list) list.push(r)
+        else map.set(d, [r])
+      }
+    }
+    return map
+  }, [state.reminders, span])
+
+  const month = fromISO(anchor)
+  const shift = (n: number) => {
+    const next = addMonths(`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-01`, n)
+    setAnchor(next)
+    setPick(null)
+  }
+
+  const shown = pick ? byDay.get(pick) ?? [] : []
+
   return (
-    <Sheet title="In den Kalender" onClose={onClose}
+    <Sheet title="Kalender" wide onClose={onClose}
       footer={<button className="btn btn--primary" onClick={onClose}>Schließen</button>}>
+
+      <div className="cal">
+        <div className="cal-head">
+          <button className="arrowbtn" onClick={() => shift(-1)} aria-label="Monat zurück"><ChevL /></button>
+          <div className="cal-month">{MONTHS[month.getMonth()]} {month.getFullYear()}</div>
+          <button className="arrowbtn" onClick={() => shift(1)} aria-label="Monat vor"><ChevR /></button>
+          {anchor.slice(0, 7) !== now.slice(0, 7) && (
+            <button className="btn btn--quiet btn--sm" onClick={() => { setAnchor(now); setPick(now) }}>Heute</button>
+          )}
+        </div>
+
+        <div className="cal-grid">
+          {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => (
+            <div className="cal-wd" key={w}>{w}</div>
+          ))}
+          {cells.map((d, i) => {
+            if (!d) return <div className="cal-cell cal-cell--out" key={`x${i}`} />
+            const list = byDay.get(d) ?? []
+            const late = d < now && list.length > 0
+            return (
+              <button
+                key={d}
+                className={'cal-cell'
+                  + (d === now ? ' cal-cell--today' : '')
+                  + (d === pick ? ' cal-cell--sel' : '')
+                  + (list.length ? ' cal-cell--has' : '')}
+                onClick={() => setPick(d === pick ? null : d)}
+              >
+                <span className="cal-n">{fromISO(d).getDate()}</span>
+                <span className="cal-dots">
+                  {list.slice(0, 3).map((r, k) => (
+                    <i className={'cal-dot' + (late ? ' cal-dot--late' : '')} key={r.id + k} />
+                  ))}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="cal-list">
+          {!pick ? (
+            <span className="cal-empty">Tag antippen.</span>
+          ) : shown.length === 0 ? (
+            <span className="cal-empty">{longDate(pick)} — nichts.</span>
+          ) : (
+            <>
+              <div className="cal-list-head">{longDate(pick)}</div>
+              {shown.map((r) => (
+                <div className="cal-item" key={r.id}>
+                  <span className="cal-item-title">{r.title}</span>
+                  <span className="cal-item-meta">{r.category} · {cadenceLabel(r.cadence)}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      <hr className="divider" />
 
       <div className="field">
         <label>Einmalig exportieren</label>

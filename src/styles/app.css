@@ -728,6 +728,61 @@ h2.section-title {
 .cat-row-sub { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 .cat-plus { margin-left: auto; color: var(--ink-4); font-size: 18px; line-height: 1; }
 
+/* Monatsuebersicht im Kalender-Blatt */
+.cal { display: flex; flex-direction: column; gap: 14px; }
+
+.cal-head { display: flex; align-items: center; gap: 8px; }
+.cal-list { max-width: 440px; }
+.cal-month {
+  font-family: var(--display); font-weight: 600; font-size: 18px;
+  letter-spacing: -.015em; min-width: 168px;
+}
+
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  /* Auf dem breiten Blatt sonst ein Raster aus Querformaten. */
+  width: 100%; max-width: 440px;
+}
+.cal-head { max-width: 440px; }
+.cal-wd {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  text-align: center; padding-bottom: 2px;
+}
+
+.cal-cell {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 0 6px;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  font-size: 13px; color: var(--ink-2);
+  transition: background .12s, border-color .12s, color .12s;
+}
+.cal-cell--out { pointer-events: none; }
+.cal-cell:hover { background: var(--paper-sunk); }
+.cal-cell--has { color: var(--ink); font-weight: 600; }
+.cal-cell--today { border-color: var(--line-strong); }
+.cal-cell--sel { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+
+/* Ein Punkt je Eintrag, hoechstens drei. Die Zeile steht auch auf leeren
+   Tagen, sonst huepfen die Zahlen. */
+.cal-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cobalt); }
+.cal-dot--late { background: var(--signal); }
+.cal-cell--sel .cal-dot { background: rgba(255, 255, 255, .85); }
+
+.cal-list {
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 84px;
+  padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.cal-list-head { font-size: 12.5px; color: var(--ink-3); }
+.cal-empty { font-size: 13px; color: var(--ink-3); }
+.cal-item { display: flex; flex-direction: column; gap: 2px; }
+.cal-item-title { font-size: 14px; font-weight: 600; }
+.cal-item-meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+
 /* ============================ Board ============================ */
 
 /* dvh statt vh wegen der einklappenden Browserleiste auf dem iPhone; die

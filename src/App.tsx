@@ -143,9 +143,9 @@ function Account({ onClose }: { onClose: () => void }) {
       footer={<button className="btn btn--primary" onClick={onClose}>Schließen</button>}>
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <Stat k="Tage abgeschickt" v={String(confirmedDays(state))} />
-        <Stat k="Future Me" v={String(state.reminders.length)} />
-        <Stat k="Knoten" v={String(state.nodes.length)} />
+        <Stat k="Tage gecheckt" v={String(confirmedDays(state))} />
+        <Stat k="Future Plans" v={String(state.reminders.length)} />
+        <Stat k="Ideen" v={String(state.nodes.length)} />
       </div>
 
       <hr className="divider" />

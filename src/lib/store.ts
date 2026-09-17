@@ -6,7 +6,7 @@ import { supabase, cloudEnabled } from './supabase'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 8
+const STATE_VERSION = 9
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -180,11 +180,53 @@ export function migrate(s: AppState): AppState {
     if (typeof scroll === 'number') day.values['scroll'] = Math.max(1, Math.min(5, Math.round(scroll) || 1))
   }
 
-  // Aktuelle Definitionen uebernehmen, die Verknuepfungen zu Board-Zielen behalten
+  // Strukturschritte, die frueher im pauschalen Ueberschreiben mitliefen.
+  // Sie gehoeren zu genau einer Fassung, nicht zu jedem Start: Sport war eine
+  // Einfachauswahl, Doomscrolling eine Stundenzahl.
+  if ((s.meta.v ?? 1) < 7) {
+    for (const id of ['sport', 'scroll']) {
+      const old = byId.get(id)
+      const def = DEFAULT_CHECKS.find((d) => d.id === id)
+      if (!old || !def) continue
+      old.kind = def.kind
+      old.options = def.options ? [...def.options] : undefined
+      old.noneOption = def.noneOption
+      old.unit = def.unit
+      old.step = def.step
+      old.target = def.target
+      old.inverse = def.inverse
+    }
+  }
+
+  // Der eigene Stand gewinnt. Bis Schritt 8 hat die Migration die Vorgabe
+  // einfach darueber gebuegelt — und dabei selbst angelegte Optionen,
+  // umbenannte Rubriken, eigene Zielwerte und die Reihenfolge weggeworfen.
+  // Ergaenzt wird nur, was es in der gespeicherten Fassung noch gar nicht gab.
   const next = DEFAULT_CHECKS.map((def) => {
     const old = byId.get(def.id)
-    return old?.goals?.length ? { ...def, goals: old.goals } : { ...def }
+    return old ? { ...def, ...old } : { ...def }
   })
+
+  // Was dabei verloren ging, steht noch in den Tagen: jede Option, die
+  // irgendwann einmal angehakt wurde und nicht aus der Vorgabe stammt, kommt
+  // zurueck in die Auswahl. Vorgabe-Optionen, die jemand absichtlich
+  // rausgeworfen hat, bleiben draussen.
+  const fromDefaults = new Map(DEFAULT_CHECKS.map((d) => [d.id, new Set(d.options ?? [])]))
+  for (const c of next) {
+    if (c.kind !== 'multi') continue
+    const have = new Set(c.options ?? [])
+    const stock = fromDefaults.get(c.id) ?? new Set<string>()
+    const back: string[] = []
+    for (const day of Object.values(s.days)) {
+      const v = day.values[c.id]
+      if (!Array.isArray(v)) continue
+      for (const o of v) {
+        if (have.has(o) || stock.has(o) || back.includes(o)) continue
+        back.push(o)
+      }
+    }
+    if (back.length) c.options = [...(c.options ?? []), ...back]
+  }
 
   // Das alte 'food' war eine 1-5-Skala und bleibt archiviert — die neue
   // Rubrik 'brudi_kcal' zaehlt Kilokalorien und faengt bei null an.

@@ -29,7 +29,7 @@ schlägt bei Typfehlern fehl.
 
 | Pfad | Inhalt |
 |---|---|
-| `src/lib/store.ts` | Einziger Schreibweg in den State. `update()` klont, mutiert, persistiert. `transient` für Drags, `commit()` schreibt durch. |
+| `src/lib/store.ts` | Einziger Schreibweg in den State. `update()` klont, mutiert, persistiert. `transient` für Drags, `commit()` schreibt durch. **`migrate()`: der gespeicherte Stand gewinnt** (`{ ...vorgabe, ...gespeichert }`) — eigene Optionen, umbenannte Rubriken, eigene Zielwerte und die Reihenfolge überleben jeden Versionssprung. Strukturelle Änderungen an einer Rubrik gehören in einen Schritt mit Versionsabfrage, nie in ein pauschales Überschreiben mit `DEFAULT_CHECKS`. |
 | `src/lib/scoring.ts` | Zielwerte, Serien, Momentum der Board-Ziele. **`countedValues()` ist die Wahrheit**: ein Tag zählt erst als bestätigt, vorher sind die vom Vortag übernommenen Werte nur ein Vorschlag. Gemessene Rubriken (`kind: 'external'`) zählen immer. Statistik, Zusammenhänge und Serien lesen ausschließlich darüber. |
 | `src/lib/insights.ts` | Der Zusammenhang-Finder. Rangkorrelation (Spearman) über alle Merkmalspaare, am selben Tag, versetzt um 1/2/3/7 Tage und als Last der letzten 3 bzw. 7 Tage. Versetzte Tests rechnen den Vortag des Ergebnisses heraus, sonst findet man nur den Eigenlauf. Die Freiheitsgrade kommen aus der **wirksamen** Stichprobengröße (Bartlett), nicht aus der Zahl der Tage. Am Ende Benjamini-Yekutieli über **alle** durchgeführten Tests — wer `tests` nicht mitzählt, macht die Korrektur kaputt. Eine Mehrfachauswahl liefert jede Option als eigenes Merkmal. |
 | `src/data/catalog.ts` | Das Regal — Vorlagen für Future Me Problems |

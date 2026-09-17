@@ -53,7 +53,14 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
       const v = countedValues(s, addDays(date, -i))[def.id]
       if (isFilled(v)) { found = v; break }
     }
-    const value = found ?? def.fallback
+    let value = found ?? def.fallback
+    // Eine Option, die es nicht mehr gibt, darf nicht ueber den Vortag
+    // zurueckkommen — sonst laesst sie sich nie entfernen.
+    if (def.kind === 'multi' && Array.isArray(value)) {
+      const offered = new Set(def.options ?? [])
+      const kept = value.filter((o) => offered.has(o))
+      value = kept.length ? kept : null
+    }
     if (isFilled(value)) out[def.id] = value as CheckValue
   }
   return out
