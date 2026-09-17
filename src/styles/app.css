@@ -843,16 +843,18 @@ h2.section-title {
     0 14px 30px -12px rgba(20, 22, 28, .26);
 }
 /* Doppelte Klasse, sonst gewinnt `.node:hover` mit seinem eigenen Schatten
-   und der Ring verschwindet genau dann, wenn der Zeiger noch draufsteht.
-   Auswahl als Ring aussen herum, nicht als neue Randfarbe: sonst wird aus
-   einer orangen Karte beim Anwaehlen eine blaue, und die Farbe bedeutet
-   ploetzlich "ausgewaehlt" statt "gehoert zu dieser Gruppe". Der schmale
-   Spalt in der Bodenfarbe haelt den Ring auch auf einer kobaltblauen Karte
-   sichtbar. */
+   und die Auswahl verschwindet genau dann, wenn der Zeiger noch draufsteht.
+   Ausgewaehlt heisst: derselbe Rand, nur kraeftiger und in voller Farbe.
+   Ein kobaltblauer Ring waere bequemer, macht aber aus einem orangen Ding
+   beim Anwaehlen ein blaues — und dann heisst die Farbe ploetzlich
+   "ausgewaehlt" statt "gehoert zu dieser Gruppe".
+   Das Polster gleicht die dickere Kante aus, sonst wuechse die Karte. */
 .node.node--sel {
+  border-width: 2px;
+  border-color: var(--n);
+  padding: 12px 14px;
   box-shadow:
-    0 0 0 2px var(--paper-sunk),
-    0 0 0 4px var(--cobalt),
+    0 1px 2px rgba(20, 22, 28, .05),
     0 14px 30px -12px rgba(20, 22, 28, .26);
 }
 .node--dragging {
@@ -922,9 +924,19 @@ h2.section-title {
   border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--surface) 42%, transparent);
   cursor: grab;
+  transition: border-color .18s, border-width .12s, background .18s;
 }
+/* Wie beim Knoten: kein blauer Ring, sondern der eigene Rahmen kraeftiger.
+   `box-sizing: border-box` haelt dabei die Aussenkante an ihrem Platz, der
+   Bereich springt also nicht. */
 .frame.frame--sel {
-  box-shadow: 0 0 0 2px var(--paper-sunk), 0 0 0 4px var(--cobalt);
+  border-width: 4px;
+  border-color: var(--n, var(--ink));
+}
+.frame.frame--sel > .frame-label {
+  border-width: 2px;
+  border-color: var(--n, var(--ink));
+  color: var(--ink);
 }
 .frame-label {
   position: absolute; top: -12px; left: 14px;
