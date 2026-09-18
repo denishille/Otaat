@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
-import { SCALE_LABELS } from '../data/checks'
+import { CHECK_CATALOG, SCALE_LABELS, type CheckTemplate } from '../data/checks'
 import { activeChecks, carriedDefaults, isFilled, scoreDay, streak } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
@@ -19,6 +19,7 @@ export function Today() {
   const [editing, setEditing] = useState<CheckDef | null>(null)
   const [stats, setStats] = useState<CheckDef | null>(null)
   const [adding, setAdding] = useState(false)
+  const [picking, setPicking] = useState(false)
 
   const defs = activeChecks(state)
   const entry = state.days[date]
@@ -227,6 +228,20 @@ export function Today() {
         </div>
       </div>
 
+      {defs.length === 0 ? (
+        /* Frisch angefangen: es gibt noch nichts zu zeigen und nichts zu
+           bestaetigen. Nur die Frage, was man ueberhaupt wissen will. */
+        <div className="empty">
+          <strong>Noch keine Rubriken.</strong>
+          Such dir im Regal aus, was du über dich wissen willst — oder leg dir
+          eigene an. Beides lässt sich jederzeit ändern.
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+            <button className="btn btn--primary" onClick={() => setPicking(true)}>Regal öffnen</button>
+            <button className="btn btn--ghost" onClick={() => setAdding(true)}>Eigene anlegen</button>
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="daysum">
         <div className="daysum-cell">
           <div className="daysum-k">Erfasst</div>
@@ -262,7 +277,7 @@ export function Today() {
         <button
           className="check"
           style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', borderStyle: 'dashed', background: 'transparent', boxShadow: 'none' }}
-          onClick={() => setAdding(true)}
+          onClick={() => setPicking(true)}
         >
           <Plus /> <span style={{ fontSize: 14, fontWeight: 550 }}>Noch was tracken</span>
         </button>
@@ -274,6 +289,15 @@ export function Today() {
         onConfirm={confirmDay}
         onUndo={unconfirmDay}
       />
+      </>
+      )}
+
+      {picking && (
+        <CheckPicker
+          onClose={() => setPicking(false)}
+          onOwn={() => { setPicking(false); setAdding(true) }}
+        />
+      )}
 
       {reorder && (
         <div
@@ -587,6 +611,126 @@ function ConfirmBar({ confirmed, score, onConfirm, onUndo }: {
       </button>
     </div>
   )
+}
+
+/**
+ * Das Regal: Vorlagen zum Aussuchen.
+ *
+ * Schon vorhanden ist eine Vorlage, wenn die Kennung passt — oder der Name.
+ * Der Name zaehlt mit, weil dieselbe Rubrik schon mal unter eigener Kennung
+ * angelegt worden sein kann; sonst haette man sie zweimal. Weggenommen wird
+ * aber nur, was wirklich aus dem Regal kam: eine gleichnamige eigene Rubrik
+ * anzufassen waere uebergriffig.
+ */
+function CheckPicker({ onClose, onOwn }: { onClose: () => void; onOwn: () => void }) {
+  const { state } = useStore()
+  const [q, setQ] = useState('')
+
+  const byId = new Set(state.checks.map((c) => c.id))
+  const byName = new Set(state.checks.map((c) => c.name.trim().toLowerCase()))
+  const drin = (tpl: CheckTemplate) =>
+    byId.has(tpl.def.id) || byName.has(tpl.def.name.trim().toLowerCase())
+
+  const groups = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return CHECK_CATALOG
+    return CHECK_CATALOG
+      .map((g) => ({ title: g.title, items: g.items.filter((i) =>
+        (i.def.name + ' ' + g.title + ' ' + (i.note ?? '')).toLowerCase().includes(needle)) }))
+      .filter((g) => g.items.length)
+  }, [q])
+
+  function toggle(tpl: CheckTemplate) {
+    if (byId.has(tpl.def.id)) {
+      update((d) => { d.checks = d.checks.filter((c) => c.id !== tpl.def.id) })
+      toast(`„${tpl.def.name}" raus`)
+      return
+    }
+    if (drin(tpl)) {
+      toast(`„${tpl.def.name}" hast du schon, unter eigenem Namen`)
+      return
+    }
+    update((d) => {
+      const sort = Math.max(0, ...d.checks.map((c) => c.sort)) + 10
+      d.checks.push({ ...tpl.def, sort })
+    })
+    toast(`„${tpl.def.name}" dabei`)
+  }
+
+  function addAll(items: CheckTemplate[]) {
+    const fresh = items.filter((i) => !drin(i))
+    if (!fresh.length) return
+    update((d) => {
+      let sort = Math.max(0, ...d.checks.map((c) => c.sort))
+      for (const i of fresh) { sort += 10; d.checks.push({ ...i.def, sort }) }
+    })
+    toast(`${fresh.length} dabei`)
+  }
+
+  return (
+    <Sheet
+      title="Das Regal"
+      wide
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn--quiet" style={{ marginRight: 'auto' }} onClick={onOwn}>
+            Eigene anlegen
+          </button>
+          <button className="btn btn--primary" onClick={onClose}>Fertig</button>
+        </>
+      }
+    >
+      <input
+        className="input" type="search"
+        placeholder="Suchen — Schlaf, Kaffee, Laune …"
+        value={q} onChange={(e) => setQ(e.target.value)}
+        autoFocus={autoFocusUnlessTouch} {...noAutofill}
+      />
+
+      {groups.map((g) => (
+        <section key={g.title}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+            <h4 style={{ margin: 0, fontFamily: 'var(--display)', fontWeight: 400, fontSize: 19 }}>{g.title}</h4>
+            <button className="btn btn--quiet btn--sm" onClick={() => addAll(g.items)}>alle</button>
+          </div>
+          <div className="cat-grid">
+            {g.items.map((i) => (
+              <button
+                key={i.def.id}
+                className={'cat-row' + (drin(i) ? ' cat-row--added' : '')}
+                onClick={() => toggle(i)}
+                title={drin(i) ? 'Wieder rausnehmen' : 'Übernehmen'}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div className="cat-row-title">{i.def.name}</div>
+                  <div className="cat-row-sub">{kindLabel(i.def)}{i.note ? ` · ${i.note}` : ''}</div>
+                </div>
+                <span className="cat-plus">{drin(i) ? <Check /> : '+'}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {groups.length === 0 && (
+        <div className="empty"><strong>Nichts gefunden.</strong>Leg es einfach selbst an.</div>
+      )}
+    </Sheet>
+  )
+}
+
+/** Was fuer eine Art Rubrik das ist, in einem Wort. */
+function kindLabel(def: CheckTemplate['def']): string {
+  switch (def.kind) {
+    case 'bool': return 'Ja / Nein'
+    case 'scale': return 'Skala 1–5'
+    case 'number': return def.unit ? `Zahl in ${def.unit}` : 'Zahl'
+    case 'multi': return 'Mehrfachauswahl'
+    case 'choice': return 'Auswahl'
+    case 'text': return 'Notiz'
+    case 'external': return 'gemessen'
+  }
 }
 
 /**

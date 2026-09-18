@@ -1,18 +1,20 @@
 import { useSyncExternalStore } from 'react'
 import type { AppState, Board, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEntry, Reminder, Theme } from './types'
-import { DEFAULT_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
+import { CATALOG_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
 import { SUPABASE_URL, T } from '../data/otaat-source'
 
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 9
+const STATE_VERSION = 10
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
 export const emptyState = (): AppState => ({
-  checks: DEFAULT_CHECKS.map((c) => ({ ...c })),
+  // Eine frische App hat keine Rubriken. Man sucht sich im Regal aus, was man
+  // wissen will — zwoelf fremde Vorgaben waren vor allem Arbeit beim Ausmisten.
+  checks: [],
   days: {},
   reminders: [],
   nodes: [],
@@ -112,8 +114,7 @@ export function loadLocal() {
     const parsed = JSON.parse(raw) as Partial<AppState>
     const base = emptyState()
     const merged = { ...base, ...parsed, meta: { ...base.meta, ...parsed.meta } }
-    // Ein Stand ohne Checks waere eine leere App ohne Weg zurueck.
-    if (!merged.checks?.length) merged.checks = base.checks
+    if (!merged.checks) merged.checks = []
     if (!merged.meta.boards?.length) {
       merged.meta.boards = base.meta.boards
       merged.meta.activeBoard = base.meta.activeBoard
@@ -161,7 +162,7 @@ export function migrate(s: AppState): AppState {
     delete (day as { awarded?: string[] }).awarded
   }
 
-  const externalIds = new Set(DEFAULT_CHECKS.filter((c) => c.kind === 'external').map((c) => c.id))
+  const externalIds = new Set(CATALOG_CHECKS.filter((c) => c.def.kind === 'external').map((c) => c.def.id))
   for (const day of Object.values(s.days)) {
     if (day.confirmed === undefined) {
       day.confirmed = Object.entries(day.values).some(
@@ -193,7 +194,7 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) < 7) {
     for (const id of ['sport', 'scroll']) {
       const old = byId.get(id)
-      const def = DEFAULT_CHECKS.find((d) => d.id === id)
+      const def = CATALOG_CHECKS.find((d) => d.def.id === id)?.def
       if (!old || !def) continue
       old.kind = def.kind
       old.options = def.options ? [...def.options] : undefined
@@ -205,20 +206,25 @@ export function migrate(s: AppState): AppState {
     }
   }
 
-  // Der eigene Stand gewinnt. Bis Schritt 8 hat die Migration die Vorgabe
-  // einfach darueber gebuegelt — und dabei selbst angelegte Optionen,
-  // umbenannte Rubriken, eigene Zielwerte und die Reihenfolge weggeworfen.
-  // Ergaenzt wird nur, was es in der gespeicherten Fassung noch gar nicht gab.
-  const next = DEFAULT_CHECKS.map((def) => {
-    const old = byId.get(def.id)
-    return old ? { ...def, ...old } : { ...def }
-  })
+  // Nur der eigene Stand. Bis Schritt 9 hat die Migration hier die Vorgabe
+  // hineingemischt — wer eine Rubrik geloescht hatte, bekam sie beim naechsten
+  // Versionssprung zurueck, und seit Schritt 10 gibt es ueberhaupt keine
+  // Vorgabe mehr. Das Regal ist eine Auswahl, keine Startaufstellung.
+  const next = s.checks.map((c) => ({ ...c }))
 
-  // Was dabei verloren ging, steht noch in den Tagen: jede Option, die
-  // irgendwann einmal angehakt wurde und nicht aus der Vorgabe stammt, kommt
-  // zurueck in die Auswahl. Vorgabe-Optionen, die jemand absichtlich
-  // rausgeworfen hat, bleiben draussen.
-  const fromDefaults = new Map(DEFAULT_CHECKS.map((d) => [d.id, new Set(d.options ?? [])]))
+  // Ein Feld, das es in der gespeicherten Fassung noch gar nicht gab:
+  // Alkohol faengt jetzt bei 0 an statt im Leeren. Solche Nachtraege gehoeren
+  // an genau eine Fassung, nicht in ein pauschales Ueberschreiben.
+  if ((s.meta.v ?? 1) < 10) {
+    const booze = next.find((c) => c.id === 'booze')
+    if (booze && booze.fallback === undefined) booze.fallback = 0
+  }
+
+  // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,
+  // stehen noch in den Tagen: was irgendwann angehakt wurde und nicht aus dem
+  // Regal stammt, kommt zurueck in die Auswahl. Regal-Optionen, die jemand
+  // absichtlich rausgeworfen hat, bleiben draussen.
+  const fromDefaults = new Map(CATALOG_CHECKS.map((d) => [d.def.id, new Set(d.def.options ?? [])]))
   for (const c of next) {
     if (c.kind !== 'multi') continue
     const have = new Set(c.options ?? [])
@@ -240,15 +246,12 @@ export function migrate(s: AppState): AppState {
 
   // Abgeschaffte Checks: mit Daten ins Archiv, ohne Daten raus
   for (const id of RETIRED_CHECK_IDS) {
-    const old = byId.get(id)
-    if (!old) continue
+    const i = next.findIndex((c) => c.id === id)
+    if (i < 0) continue
     const used = Object.values(s.days).some((d) => d.values[id] !== undefined)
-    if (used) next.push({ ...old, archived: true })
+    if (used) next[i] = { ...next[i], archived: true }
+    else next.splice(i, 1)
   }
-
-  // Selbst angelegte Checks bleiben unangetastet
-  const known = new Set([...DEFAULT_CHECKS.map((d) => d.id), ...RETIRED_CHECK_IDS])
-  for (const c of s.checks) if (!known.has(c.id)) next.push(c)
 
   return { ...s, checks: next, meta: { ...s.meta, v: STATE_VERSION } }
 }

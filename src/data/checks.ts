@@ -1,37 +1,94 @@
 import type { CheckDef } from '../lib/types'
 
-/* Startaufstellung des Everything Checkers.
-   Reihenfolge ist Absicht: erst die beiden grossen Zeitbloecke des Tages,
-   dann was der Koerper gemacht hat, dann der Kopf, dann Erholung, zuletzt
-   die Sachen, von denen weniger besser ist. Sie laesst sich im Checker
-   per Griff umsortieren, `sort` wird dabei neu vergeben.
+/* Das Regal des Everything Checkers.
+   -----------------------------------------------------------------------
+   Eine frische App hat **keine** Rubriken. Was hier steht, sind Vorlagen zum
+   Aussuchen — wer nichts davon mag, legt sich eigene an. Frueher war das die
+   Startaufstellung; das hiess, jeder fing mit zwoelf fremden Rubriken an und
+   musste erst mal ausmisten.
 
    `target`   = ab wann der Tag fuer diesen Check als erfuellt gilt
    `inverse`  = weniger ist besser, target ist dann eine Obergrenze
-   `fallback` = Startwert, solange es keinen Vortag zum Uebernehmen gibt */
+   `fallback` = Startwert, solange es keinen Vortag zum Uebernehmen gibt
 
-export const DEFAULT_CHECKS: CheckDef[] = [
-  { id: 'sleep',    name: 'Schlaf',        kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8, sort: 10 },
-  { id: 'work',     name: 'Arbeit',        kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8, sort: 20 },
-  { id: 'sport',    name: 'Sport',         kind: 'multi',  sort: 30,
-    options: ['Kraft', 'Cardio', 'Mobility', 'Ballsport', 'Draußen', 'Nix'],
-    noneOption: 'Nix' },
-  // Kommt aus dem Kalorienbrudi-Bestand und wird nicht von Hand gepflegt.
-  // Eigene id statt der alten 'food': das war eine 1-5-Skala, hier stehen
-  // Kilokalorien — in einer Reihe waeren die beiden nicht vergleichbar.
-  // Ohne Zielwert: die Zahl steht fuer sich, es wird nichts dagegen bewertet.
-  { id: 'brudi_kcal', name: 'Essen', kind: 'external', source: 'brudi',
-    unit: 'kcal', sort: 35 },
-  { id: 'mood',     name: 'Laune',         kind: 'scale',  target: 4, sort: 40 },
-  { id: 'focus',    name: 'Fokus',         kind: 'scale',  target: 4, sort: 50 },
-  { id: 'people',   name: 'Unter Menschen',kind: 'bool',   sort: 60 },
-  { id: 'meditate', name: 'Meditation',    kind: 'bool',   sort: 70 },
-  { id: 'sauna',    name: 'Sauna',         kind: 'bool',   sort: 80 },
-  { id: 'scroll',   name: 'Doomscrolling', kind: 'scale',  target: 2, inverse: true, sort: 90 },
-  { id: 'coffee',   name: 'Kaffee',        kind: 'number', unit: 'Tassen', step: 1, target: 3, inverse: true, sort: 100 },
-  // Kein Glas ist der Normalfall, also steht da eine 0 und keine Leere.
-  { id: 'booze',    name: 'Alkohol',       kind: 'number', unit: 'Gläser', step: 1, target: 0, inverse: true, fallback: 0, sort: 110 },
+   `sort` steht hier nur fuer die Reihenfolge im Regal. Beim Uebernehmen
+   bekommt die Rubrik eine neue Nummer ans Ende, und im Checker laesst sich
+   alles per Griff umsortieren. */
+
+export interface CheckTemplate {
+  def: Omit<CheckDef, 'sort'>
+  /** Was unter dem Namen steht. Nur wo es wirklich was erklaert. */
+  note?: string
+}
+
+export interface CheckGroup {
+  title: string
+  items: CheckTemplate[]
+}
+
+export const CHECK_CATALOG: CheckGroup[] = [
+  {
+    title: 'Der Tag',
+    items: [
+      { def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
+      { def: { id: 'work', name: 'Arbeit', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
+    ],
+  },
+  {
+    title: 'Körper',
+    items: [
+      {
+        def: {
+          id: 'sport', name: 'Sport', kind: 'multi',
+          options: ['Kraft', 'Cardio', 'Mobility', 'Ballsport', 'Draußen', 'Nix'],
+          noneOption: 'Nix',
+        },
+        note: 'Optionen frei erweiterbar',
+      },
+      { def: { id: 'tense', name: 'Verspannt', kind: 'scale', target: 5, inverse: true } },
+      { def: { id: 'creatine', name: 'Kreatin', kind: 'bool' } },
+      { def: { id: 'minoxidil', name: 'Minoxidil', kind: 'bool' } },
+      { def: { id: 'skincare', name: 'Skincare', kind: 'bool' } },
+      // Liest den oeffentlichen Tagesschnitt aus dem Kalorienbrudi-Bestand.
+      // Das ist genau ein fremder Datenstand, nicht der eigene — deshalb
+      // steht das auch auf der Karte im Regal.
+      {
+        def: { id: 'brudi_kcal', name: 'Essen', kind: 'external', source: 'brudi', unit: 'kcal' },
+        note: 'holt sich die Kalorien aus dem Kalorienbrudi-Bestand',
+      },
+    ],
+  },
+  {
+    title: 'Kopf',
+    items: [
+      { def: { id: 'mood', name: 'Laune', kind: 'scale', target: 4 } },
+      { def: { id: 'focus', name: 'Fokus', kind: 'scale', target: 4 } },
+      { def: { id: 'energy', name: 'Energie', kind: 'scale' } },
+      { def: { id: 'meditate', name: 'Meditation', kind: 'bool' } },
+    ],
+  },
+  {
+    title: 'Erholung & Menschen',
+    items: [
+      { def: { id: 'people', name: 'Unter Menschen', kind: 'bool' } },
+      { def: { id: 'sauna', name: 'Sauna', kind: 'bool' } },
+      { def: { id: 'im8', name: 'Im8', kind: 'bool' } },
+    ],
+  },
+  {
+    title: 'Weniger ist besser',
+    items: [
+      { def: { id: 'scroll', name: 'Doomscrolling', kind: 'scale', target: 2, inverse: true } },
+      { def: { id: 'coffee', name: 'Kaffee', kind: 'number', unit: 'Tassen', step: 1, target: 3, inverse: true } },
+      {
+        def: { id: 'booze', name: 'Alkohol', kind: 'number', unit: 'Gläser', step: 1, target: 0, inverse: true, fallback: 0 },
+        note: 'kein Glas ist der Normalfall, deshalb startet es bei 0',
+      },
+    ],
+  },
 ]
+
+export const CATALOG_CHECKS: CheckTemplate[] = CHECK_CATALOG.flatMap((g) => g.items)
 
 export const SCALE_LABELS = ['mies', 'geht so', 'ok', 'gut', 'stark']
 
