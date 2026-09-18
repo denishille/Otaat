@@ -413,25 +413,27 @@ h2.section-title {
 }
 
 /* Mehrfachauswahl */
-.multi { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Alles in dieser Reihe ist gleich hoch — die Optionen und die beiden
+   Knoepfe dahinter. 40 Pixel, weil das hier mit dem Daumen bedient wird. */
+.multi { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .multi button {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 11px; border-radius: var(--r-pill);
-  border: 1px solid var(--line-strong); font-size: 12.5px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 15px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong); font-size: 13.5px; font-weight: 500;
   color: var(--ink-3); transition: all .13s;
 }
 .multi button:hover { border-color: var(--ink-3); color: var(--ink); }
 .multi button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 .multi button.none[aria-pressed='true'] { background: var(--ink-3); border-color: var(--ink-3); }
 .multi .addopt {
-  width: 28px; padding: 0; justify-content: center;
+  width: 40px; padding: 0; font-size: 17px;
   border-style: dashed; color: var(--ink-4);
 }
 .multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
 /* Das Plus legt an, der Stift raeumt auf — zwei gleich aussehende
    gestrichelte Kreise waren nicht auseinanderzuhalten. */
 .multi .editopt {
-  width: 28px; padding: 0; justify-content: center;
+  width: 40px; padding: 0; font-size: 16px;
   border: 1px solid var(--line-strong); border-radius: var(--r-pill);
   background: var(--paper-sunk); color: var(--ink-3);
 }
@@ -453,19 +455,19 @@ h2.section-title {
   position: absolute; top: -5px; right: -5px;
   /* Padding und Rahmen der Options-Chips zuruecknehmen, sonst wird aus dem
      Kreis ein Oval. */
-  width: 17px; height: 17px; min-width: 0; padding: 0; border: 0;
+  width: 20px; height: 20px; min-width: 0; min-height: 0; padding: 0; border: 0;
   border-radius: 50%;
   display: grid; place-items: center;
   background: var(--signal); color: #fff;
-  font-size: 10px; line-height: 1;
+  font-size: 11px; line-height: 1;
   box-shadow: 0 0 0 2px var(--surface);
   transition: transform .12s;
 }
 .multi .multi-x:hover { transform: scale(1.15); }
 .multi input {
-  width: 108px; padding: 5px 10px; border-radius: var(--r-pill);
+  width: 128px; height: 40px; padding: 0 14px; border-radius: var(--r-pill);
   border: 1px solid var(--cobalt); background: var(--surface);
-  font-size: 12.5px; outline: none;
+  font-size: 13.5px; outline: none;
 }
 
 /* Text */
