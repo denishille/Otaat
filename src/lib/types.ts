@@ -44,6 +44,15 @@ export interface DayEntry {
    * nicht in Serie, Statistik oder Zusammenhaenge ein.
    */
   confirmed?: boolean
+  /**
+   * Checks, die ihre Uebernahme vom Vortag an diesem Tag schon bekommen
+   * haben. Ohne das Gedaechtnis waere ein geloeschter Wert im naechsten
+   * Wimpernschlag wieder da — die Uebernahme kann nicht unterscheiden, ob
+   * ein Feld noch nie gefuellt war oder gerade absichtlich geleert wurde.
+   * Eine erst heute angelegte Rubrik steht noch nicht drin und holt sich
+   * ihre Uebernahme deshalb nach.
+   */
+  carried?: ID[]
 }
 
 /* ---------- Future Me Problems ---------- */

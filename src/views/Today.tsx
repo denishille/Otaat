@@ -64,14 +64,24 @@ export function Today() {
    * nicht als Vorschlag. Nur fuer heute: aeltere Tage rueckwirkend zu fuellen
    * wuerde Daten erfinden, die es nie gab. Gezaehlt wird der Tag davon
    * nicht — dazu muss er bestaetigt werden.
+   *
+   * Jeder Check bekommt seine Uebernahme genau einmal, vermerkt in
+   * `day.carried`. Vorher lief das bei jedem Durchlauf neu, und ein per
+   * Ruecktaste geleertes Zahlenfeld war sofort wieder voll — loeschen ging
+   * schlicht nicht. Eine Rubrik, die es heute noch gar nicht gab, steht nicht
+   * im Vermerk und holt sich ihre Uebernahme nach, sobald sie da ist.
    */
   useEffect(() => {
     if (date !== today()) return
-    const missing = Object.entries(carried).filter(([id]) => !isFilled(state.days[date]?.values[id]))
-    if (!missing.length) return
+    const day = state.days[date]
+    const hatte = new Set(day?.carried ?? [])
+    const offen = Object.entries(carried).filter(([id]) => !hatte.has(id) && !isFilled(day?.values[id]))
+    const neu = Object.keys(carried).filter((id) => !hatte.has(id))
+    if (!neu.length) return
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {} })
-      for (const [id, v] of missing) if (!isFilled(day.values[id])) day.values[id] = v
+      const entry = (d.days[date] ??= { date, values: {} })
+      for (const [id, v] of offen) if (!isFilled(entry.values[id])) entry.values[id] = v
+      entry.carried = [...hatte, ...neu]
     })
   }, [date, carried, state.days])
 

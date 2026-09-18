@@ -29,7 +29,8 @@ export const DEFAULT_CHECKS: CheckDef[] = [
   { id: 'sauna',    name: 'Sauna',         kind: 'bool',   sort: 80 },
   { id: 'scroll',   name: 'Doomscrolling', kind: 'scale',  target: 2, inverse: true, sort: 90 },
   { id: 'coffee',   name: 'Kaffee',        kind: 'number', unit: 'Tassen', step: 1, target: 3, inverse: true, sort: 100 },
-  { id: 'booze',    name: 'Alkohol',       kind: 'number', unit: 'Gläser', step: 1, target: 0, inverse: true, sort: 110 },
+  // Kein Glas ist der Normalfall, also steht da eine 0 und keine Leere.
+  { id: 'booze',    name: 'Alkohol',       kind: 'number', unit: 'Gläser', step: 1, target: 0, inverse: true, fallback: 0, sort: 110 },
 ]
 
 export const SCALE_LABELS = ['mies', 'geht so', 'ok', 'gut', 'stark']
