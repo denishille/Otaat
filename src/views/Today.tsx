@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
-import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
+import type { AppState, CheckDef, CheckKind, CheckValue, DayEntry } from '../lib/types'
 import { CHECK_CATALOG, SCALE_LABELS, type CheckTemplate } from '../data/checks'
 import { activeChecks, carriedDefaults, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
@@ -12,6 +12,17 @@ import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { CheckStats } from './CheckStats'
 import { toast } from '../components/Toasts'
+
+/**
+ * Ein frisch angelegter Tag ist ausdruecklich **nicht** bestaetigt.
+ *
+ * Bliebe das Feld offen, waere er von einem Tag aus der Zeit vor dem
+ * Bestaetigen-Knopf nicht zu unterscheiden — und die Migration hat genau
+ * die nachtraeglich festgeschrieben. Wer einen alten Tag aufmacht, etwas
+ * eintraegt und bewusst nicht abschickt, fand ihn beim naechsten Start
+ * bestaetigt vor.
+ */
+const blankDay = (date: string): DayEntry => ({ date, values: {}, confirmed: false })
 
 export function Today() {
   const { state } = useStore()
@@ -51,7 +62,7 @@ export function Today() {
 
       update((d) => {
         for (const row of rows) {
-          const day = (d.days[row.date] ??= { date: row.date, values: {} })
+          const day = (d.days[row.date] ??= blankDay(row.date))
           if (day.values[def.id] !== row.kcal) day.values[def.id] = row.kcal
         }
       })
@@ -80,7 +91,7 @@ export function Today() {
     const neu = Object.keys(carried).filter((id) => !hatte.has(id))
     if (!neu.length) return
     update((d) => {
-      const entry = (d.days[date] ??= { date, values: {} })
+      const entry = (d.days[date] ??= blankDay(date))
       for (const [id, v] of offen) if (!isFilled(entry.values[id])) entry.values[id] = v
       entry.carried = [...hatte, ...neu]
     })
@@ -91,7 +102,7 @@ export function Today() {
   /** Direkt an einen Schluessel im Tag schreiben — fuer die Uhrzeit neben dem Wert. */
   function setRaw(key: string, value: CheckValue) {
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {} })
+      const day = (d.days[date] ??= blankDay(date))
       if (value === null) delete day.values[key]
       else day.values[key] = value
       // Einmal von Hand angefasst heisst: nicht wieder ueberschreiben.
@@ -101,7 +112,7 @@ export function Today() {
 
   function setValue(def: CheckDef, value: CheckValue) {
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {} })
+      const day = (d.days[date] ??= blankDay(date))
       if (value === null) delete day.values[def.id]
       else day.values[def.id] = value
     })
@@ -114,7 +125,7 @@ export function Today() {
   function confirmDay() {
     const sc = scoreDay(state, date)
     update((d) => {
-      const day = (d.days[date] ??= { date, values: {} })
+      const day = (d.days[date] ??= blankDay(date))
       day.confirmed = true
     })
     toast(sc.total > 0 && sc.filled === sc.total ? 'Tag vollständig' : 'Tag bestätigt')

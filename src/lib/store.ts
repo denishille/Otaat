@@ -139,11 +139,6 @@ export function migrate(s: AppState): AppState {
 
   const byId = new Map(s.checks.map((c) => [c.id, c]))
 
-  // Tage aus der Zeit vor dem Bestaetigen-Knopf: was damals eingetragen
-  // wurde, galt als erfasst und bleibt es. Tage, in denen nur gemessene
-  // Werte stehen — die 180 Tage Kalorien aus dem Abgleich — werden nicht
-  // nachtraeglich zu bestaetigten Tagen, sonst entstuende eine Serie, die es
-  // nie gab.
   // Alles, was bisher auf dem einen Board lag, bekommt dessen Kennung.
   if (!s.meta.boards?.length) {
     s.meta.boards = [{ ...FIRST_BOARD }]
@@ -162,12 +157,22 @@ export function migrate(s: AppState): AppState {
     delete (day as { awarded?: string[] }).awarded
   }
 
-  const externalIds = new Set(CATALOG_CHECKS.filter((c) => c.def.kind === 'external').map((c) => c.def.id))
-  for (const day of Object.values(s.days)) {
-    if (day.confirmed === undefined) {
-      day.confirmed = Object.entries(day.values).some(
-        ([id, v]) => !externalIds.has(id) && v !== undefined && v !== null && v !== '',
-      )
+  // Tage aus der Zeit vor dem Bestaetigen-Knopf (bis Fassung 5): was damals
+  // eingetragen wurde, galt als erfasst und bleibt es.
+  //
+  // **Nur bis Fassung 5.** Ungebremst war das ein Selbstlaeufer: ein Tag, den
+  // man auftut und nicht abschickt, traegt gar kein `confirmed` — und dann
+  // liess sich ein absichtlich offener Tag nicht mehr von einem alten
+  // unterscheiden. Der naechste Start hat ihn festgeschrieben, ohne dass je
+  // jemand den Knopf gedrueckt hatte.
+  if ((s.meta.v ?? 1) < 6) {
+    const externalIds = new Set(CATALOG_CHECKS.filter((c) => c.def.kind === 'external').map((c) => c.def.id))
+    for (const day of Object.values(s.days)) {
+      if (day.confirmed === undefined) {
+        day.confirmed = Object.entries(day.values).some(
+          ([id, v]) => !externalIds.has(id) && v !== undefined && v !== null && v !== '',
+        )
+      }
     }
   }
 
