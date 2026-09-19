@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 10
+const STATE_VERSION = 11
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -218,6 +218,18 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) < 10) {
     const booze = next.find((c) => c.id === 'booze')
     if (booze && booze.fallback === undefined) booze.fallback = 0
+  }
+
+  // Aus "Laune" wird "Happiness". Nur, wenn der alte Name noch unveraendert
+  // dasteht — wer die Rubrik selbst umbenannt hat, behaelt seinen Namen.
+  if ((s.meta.v ?? 1) < 11) {
+    const mood = next.find((c) => c.id === 'mood')
+    if (mood && mood.name === 'Laune') mood.name = 'Happiness'
+
+    // Schlaf bekommt die Uhrzeit dazu. Auch das ein Feld, das es vorher
+    // nicht gab — wer `withTime` selbst gesetzt hat, behaelt seine Wahl.
+    const sleep = next.find((c) => c.id === 'sleep')
+    if (sleep && sleep.withTime === undefined) sleep.withTime = true
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

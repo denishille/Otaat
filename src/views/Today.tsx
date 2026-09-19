@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue } from '../lib/types'
 import { CHECK_CATALOG, SCALE_LABELS, type CheckTemplate } from '../data/checks'
-import { activeChecks, carriedDefaults, isFilled, scoreDay, streak } from '../lib/scoring'
+import { activeChecks, carriedDefaults, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, today } from '../lib/dates'
@@ -87,6 +87,17 @@ export function Today() {
   }, [date, carried, state.days])
 
   const isToday = date === today()
+
+  /** Direkt an einen Schluessel im Tag schreiben — fuer die Uhrzeit neben dem Wert. */
+  function setRaw(key: string, value: CheckValue) {
+    update((d) => {
+      const day = (d.days[date] ??= { date, values: {} })
+      if (value === null) delete day.values[key]
+      else day.values[key] = value
+      // Einmal von Hand angefasst heisst: nicht wieder ueberschreiben.
+      day.carried = [...new Set([...(day.carried ?? []), key])]
+    })
+  }
 
   function setValue(def: CheckDef, value: CheckValue) {
     update((d) => {
@@ -267,6 +278,8 @@ export function Today() {
             value={entry?.values[def.id] ?? null}
             goalNames={(def.goals ?? []).map((g) => state.nodes.find((n) => n.id === g)).filter(Boolean).map((n) => ({ text: n!.text || 'Ziel', color: n!.color }))}
             onChange={(v) => setValue(def, v)}
+            time={(entry?.values[timeKey(def.id)] as string) ?? ''}
+            onTime={(v) => setRaw(timeKey(def.id), v || null)}
             onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
             onRemoveOption={(o) => removeOption(def, o)}
@@ -338,6 +351,8 @@ interface CardProps {
   dragging: boolean
   onGrip: (e: React.PointerEvent) => void
   onChange: (v: CheckValue) => void
+  time: string
+  onTime: (v: string) => void
   onOpen: () => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
@@ -345,7 +360,7 @@ interface CardProps {
   externalState?: 'idle' | 'laden' | 'fehler'
 }
 
-function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
   const filled = isFilled(value)
 
   /**
@@ -372,7 +387,7 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} />
+      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -389,10 +404,12 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
   )
 }
 
-function Input({ def, value, onChange, onAddOption, onRemoveOption, externalState }: {
+function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption, externalState }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
+  time: string
+  onTime: (v: string) => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
   externalState?: 'idle' | 'laden' | 'fehler'
@@ -420,15 +437,23 @@ function Input({ def, value, onChange, onAddOption, onRemoveOption, externalStat
       const num = typeof value === 'number' ? value : null
       const bump = (dir: number) => onChange(Math.max(0, Math.round(((num ?? 0) + dir * step) * 100) / 100))
       return (
-        <div className="stepper">
-          <button onClick={() => bump(-1)} aria-label="weniger">−</button>
-          <input
-            type="number" inputMode="decimal" step={step} min={0}
-            value={num ?? ''} placeholder="–"
-            onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          />
-          <button onClick={() => bump(1)} aria-label="mehr">+</button>
-        </div>
+        <>
+          <div className="stepper">
+            <button onClick={() => bump(-1)} aria-label="weniger">−</button>
+            <input
+              type="number" inputMode="decimal" step={step} min={0}
+              value={num ?? ''} placeholder="–"
+              onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+            />
+            <button onClick={() => bump(1)} aria-label="mehr">+</button>
+          </div>
+          {def.withTime && (
+            <label className="timefield">
+              <span>ins Bett</span>
+              <input type="time" value={time} onChange={(e) => onTime(e.target.value)} />
+            </label>
+          )}
+        </>
       )
     }
     case 'choice':

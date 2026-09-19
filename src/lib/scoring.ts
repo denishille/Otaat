@@ -1,6 +1,9 @@
 import type { AppState, CheckDef, CheckValue, DayEntry } from './types'
 import { addDays, today } from './dates'
 
+/** Wo die Uhrzeit eines Checks im Tag liegt. Neben dem Wert, nicht darin. */
+export const timeKey = (id: string): string => `${id}@time`
+
 export const isFilled = (v: CheckValue | undefined): boolean => {
   if (v === undefined || v === null || v === '') return false
   if (Array.isArray(v)) return v.length > 0
@@ -62,6 +65,14 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
       value = kept.length ? kept : null
     }
     if (isFilled(value)) out[def.id] = value as CheckValue
+
+    // Die Uhrzeit wandert wie jeder andere Wert mit.
+    if (!def.withTime) continue
+    const key = timeKey(def.id)
+    for (let i = 1; i <= CARRY_WINDOW; i++) {
+      const v = countedValues(s, addDays(date, -i))[key]
+      if (isFilled(v)) { out[key] = v; break }
+    }
   }
   return out
 }

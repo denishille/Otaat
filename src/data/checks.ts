@@ -30,7 +30,10 @@ export const CHECK_CATALOG: CheckGroup[] = [
   {
     title: 'Der Tag',
     items: [
-      { def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
+      {
+        def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8, withTime: true },
+        note: 'dazu die Uhrzeit, zu der du ins Bett bist',
+      },
       { def: { id: 'work', name: 'Arbeit', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
     ],
   },
@@ -61,7 +64,7 @@ export const CHECK_CATALOG: CheckGroup[] = [
   {
     title: 'Kopf',
     items: [
-      { def: { id: 'mood', name: 'Laune', kind: 'scale', target: 4 } },
+      { def: { id: 'mood', name: 'Happiness', kind: 'scale', target: 4 } },
       { def: { id: 'focus', name: 'Fokus', kind: 'scale', target: 4 } },
       { def: { id: 'energy', name: 'Energie', kind: 'scale' } },
       { def: { id: 'meditate', name: 'Meditation', kind: 'bool' } },

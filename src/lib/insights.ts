@@ -1,6 +1,6 @@
 import type { AppState, CheckDef, CheckValue } from './types'
 import { addDays, today } from './dates'
-import { activeChecks, countedValues, scoreDay } from './scoring'
+import { activeChecks, countedValues, scoreDay, timeKey } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
    -----------------------------------------------------------------------
@@ -111,6 +111,24 @@ export function numeric(def: CheckDef, v: CheckValue | undefined): number | null
     case 'text':
       return null
   }
+}
+
+/**
+ * Eine Uhrzeit als Zahl, mit der sich rechnen laesst.
+ *
+ * Ab Mittag gezaehlt, nicht ab Mitternacht: sonst laege 01:30 (spaet ins
+ * Bett) bei 90 und 23:15 bei 1395, und die Reihenfolge waere genau
+ * verkehrt. So ist spaeter immer groesser — 23:15 wird 675, 01:30 wird 810.
+ */
+export function clockMinutes(v: CheckValue | undefined): number | null {
+  if (typeof v !== 'string') return null
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v)
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (h > 23 || min > 59) return null
+  const mins = h * 60 + min
+  return mins < 720 ? mins + 720 : mins - 720
 }
 
 /** Nur Checks, mit denen sich rechnen laesst. */
@@ -275,6 +293,15 @@ function features(s: AppState, dates: string[]): Feature[] {
       name: def.name,
       values: values.map((v) => numeric(def, v[def.id])),
     })
+
+    // Die Uhrzeit neben dem Wert ist eine eigene Groesse. Gross heisst spaet.
+    if (def.withTime) {
+      const key = timeKey(def.id)
+      out.push({
+        id: key, check: def, name: 'Bettzeit',
+        values: values.map((v) => clockMinutes(v[key])),
+      })
+    }
 
     // Jede Option einer Mehrfachauswahl auch fuer sich: "Kraft" und "Cardio"
     // wirken nicht gleich, und genau das ist die interessante Frage.

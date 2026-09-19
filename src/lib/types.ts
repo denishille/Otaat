@@ -26,6 +26,13 @@ export interface CheckDef {
   target?: number
   /** Niedriger ist besser (z.B. Social Media, Alkohol) */
   inverse?: boolean
+  /**
+   * Zusaetzlich zur Zahl eine Uhrzeit. Sie liegt unter einem eigenen
+   * Schluessel im selben Tag (`timeKey`), nicht im Wert des Checks — ein
+   * Check hat einen Wert, und aus 7,5 Stunden und 23:15 waere sonst ein
+   * Gebilde geworden, mit dem Statistik und Abgleich nichts anfangen.
+   */
+  withTime?: boolean
   /** Board-Nodes, auf die dieser Check einzahlt */
   goals?: ID[]
   archived?: boolean
