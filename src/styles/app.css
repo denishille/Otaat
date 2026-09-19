@@ -1241,6 +1241,12 @@ h2.section-title {
 .toast b { font-family: var(--mono); color: var(--cobalt-deep); }
 :root:not([data-theme='dark']) .toast b { color: #93A6FF; }
 
+/* Ist ein Blatt offen, sitzt unten rechts sein Fuss — und damit "Fertig".
+   Die Meldung geht dann nach oben, statt den Knopf zu verdecken. */
+:root[data-sheet] .toasts {
+  top: 16px; bottom: auto; left: 0; right: 0; align-items: center;
+}
+
 /* ============================ Responsive ============================ */
 
 @media (max-width: 860px) {

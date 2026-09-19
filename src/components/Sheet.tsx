@@ -28,6 +28,9 @@ function lockPage(): () => void {
     b.style.left = '0'
     b.style.right = '0'
     b.style.overflow = 'hidden'
+    // Solange ein Blatt offen ist, gehen die Toasts nach oben aus dem Weg.
+    // Unten rechts sassen sie sonst genau auf dem "Fertig" im Fuss.
+    document.documentElement.dataset.sheet = 'offen'
   }
   return () => {
     if (--locks > 0) return
@@ -37,6 +40,7 @@ function lockPage(): () => void {
     b.style.left = ''
     b.style.right = ''
     b.style.overflow = ''
+    delete document.documentElement.dataset.sheet
     window.scrollTo(0, lockedAt)
   }
 }

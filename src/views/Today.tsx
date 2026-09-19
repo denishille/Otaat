@@ -665,10 +665,13 @@ function CheckPicker({ onClose, onOwn }: { onClose: () => void; onOwn: () => voi
       .filter((g) => g.items.length)
   }, [q])
 
+  /* Keine Meldung beim Aufnehmen und Rausnehmen: die Zeile selbst wechselt
+     zwischen Plus und Haken, das ist die Bestaetigung. Eine Meldung je Tipp
+     war bei einem Dutzend Rubriken vor allem Flackern. Gemeldet wird nur,
+     was man sonst nicht sieht — dass naemlich gerade nichts passiert ist. */
   function toggle(tpl: CheckTemplate) {
     if (byId.has(tpl.def.id)) {
       update((d) => { d.checks = d.checks.filter((c) => c.id !== tpl.def.id) })
-      toast(`„${tpl.def.name}" raus`)
       return
     }
     if (drin(tpl)) {
@@ -679,7 +682,6 @@ function CheckPicker({ onClose, onOwn }: { onClose: () => void; onOwn: () => voi
       const sort = Math.max(0, ...d.checks.map((c) => c.sort)) + 10
       d.checks.push({ ...tpl.def, sort })
     })
-    toast(`„${tpl.def.name}" dabei`)
   }
 
   function addAll(items: CheckTemplate[]) {
