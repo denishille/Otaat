@@ -421,12 +421,22 @@ export async function pullAll() {
       meta: { ...emptyState().meta, ...((profile.data?.meta as AppState['meta']) ?? {}) },
     }
 
-    const merged = mergeIn(state, remote)
+    // Drueben kann ein Stand liegen, den eine aeltere Fassung geschrieben
+    // hat. Der muss durch dieselbe Migration wie der eigene, bevor vereinigt
+    // wird — sonst zieht er die hiesigen Definitionen auf den alten Stand
+    // zurueck, und zwar bei jedem Start neu. Genau so verschwand die Bettzeit
+    // wieder, kaum dass die Migration sie gesetzt hatte: lokal auf Fassung 11
+    // gehoben, eine Sekunde spaeter von der Fassung 9 vom Server ueberschrieben.
+    const stale = (remote.meta.v ?? 1) < STATE_VERSION
+    const merged = mergeIn(state, stale ? migrate(remote) : remote)
     // Nur hochschieben, wenn die Vereinigung wirklich etwas beigetragen hat.
     // Ein stumpfer Vergleich der beiden Objekte waere immer ungleich — andere
     // Reihenfolge, andere Schluesselreihenfolge — und jeder App-Start wuerde
     // den ganzen Bestand neu hochladen.
+    // Ein migrierter Server-Stand muss auch hoch, sonst liegt drueben weiter
+    // die alte Fassung und jedes Geraet migriert sie bis in alle Ewigkeit neu.
     const grew =
+      stale ||
       Object.keys(merged.days).length !== Object.keys(remote.days).length ||
       merged.checks.length !== remote.checks.length ||
       merged.reminders.length !== remote.reminders.length ||
