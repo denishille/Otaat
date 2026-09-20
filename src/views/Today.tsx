@@ -239,7 +239,17 @@ export function Today() {
     <>
       <div className="today-head">
         <div>
-          <div className="eyebrow">Everything Checker</div>
+          <div className="eyebrow eyebrow--row">
+            Everything Checker
+            {/* Ob der Tag festgeschrieben ist, steht ganz oben — sonst sieht
+                man es erst, wenn man bis zur Leiste ganz unten gescrollt hat. */}
+            {defs.length > 0 && (
+              <span className={'daymark' + (confirmed ? ' daymark--done' : '')}>
+                {confirmed ? <Check /> : <i className="daymark-ring" />}
+                {confirmed ? 'bestätigt' : 'offen'}
+              </span>
+            )}
+          </div>
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
