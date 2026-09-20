@@ -10,6 +10,7 @@ import { fetchBrudi } from '../lib/brudi'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
+import { useSwipe } from '../lib/swipe'
 import { CheckStats } from './CheckStats'
 import { toast } from '../components/Toasts'
 
@@ -98,6 +99,23 @@ export function Today() {
   }, [date, carried, state.days])
 
   const isToday = date === today()
+
+  /**
+   * Blaettern. Ueber den Tag hinaus geht es nicht — morgen ist noch nicht
+   * passiert.
+   *
+   * Danach zurueck nach oben: nach einem Dutzend Rubriken steht man weit
+   * unten, und ein neu aufgeschlagener Tag faengt dann mitten im Formular an,
+   * ohne dass man das Datum sieht.
+   */
+  function goDay(step: number) {
+    if (step > 0 && isToday) return
+    setDate(addDays(date, step))
+    window.scrollTo(0, 0)
+  }
+
+  // Wischen blaettert genauso: nach links das Naechste, nach rechts zurueck.
+  useSwipe({ onLeft: () => goDay(1), onRight: () => goDay(-1) })
 
   /** Direkt an einen Schluessel im Tag schreiben — fuer die Uhrzeit neben dem Wert. */
   function setRaw(key: string, value: CheckValue) {
@@ -253,9 +271,9 @@ export function Today() {
           <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
-          <button className="arrowbtn" onClick={() => setDate(addDays(date, -1))} aria-label="Tag zurück"><ChevL /></button>
+          <button className="arrowbtn" onClick={() => goDay(-1)} aria-label="Tag zurück"><ChevL /></button>
           <div className="datepick-label">{isToday ? 'Heute' : longDate(date)}</div>
-          <button className="arrowbtn" disabled={isToday} onClick={() => setDate(addDays(date, 1))} aria-label="Tag vor"><ChevR /></button>
+          <button className="arrowbtn" disabled={isToday} onClick={() => goDay(1)} aria-label="Tag vor"><ChevR /></button>
           {!isToday && <button className="btn btn--quiet btn--sm" onClick={() => setDate(today())}>Zurück zu heute</button>}
         </div>
       </div>
