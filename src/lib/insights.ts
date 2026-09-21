@@ -1,5 +1,5 @@
 import type { AppState, CheckDef, CheckValue } from './types'
-import { addDays, today } from './dates'
+import { addDays, checkerToday } from './dates'
 import { activeChecks, countedValues, scoreDay, timeKey } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
@@ -278,7 +278,7 @@ function partial(rxy: number, rxz: number, ryz: number): number | null {
 /** Anzahl der Tage, die ueberhaupt erfasst sind — Basis fuer MIN_DAYS. */
 export function loggedDays(s: AppState, window = WINDOW): number {
   let n = 0
-  for (let i = 0; i < window; i++) if (scoreDay(s, addDays(today(), -i)).logged) n++
+  for (let i = 0; i < window; i++) if (scoreDay(s, addDays(checkerToday(), -i)).logged) n++
   return n
 }
 
@@ -354,7 +354,7 @@ let cache: { sig: string; out: Insight[] } | null = null
 
 export function findInsights(s: AppState, window = WINDOW): Insight[] {
   const dates: string[] = []
-  for (let i = window - 1; i >= 0; i--) dates.push(addDays(today(), -i))
+  for (let i = window - 1; i >= 0; i--) dates.push(addDays(checkerToday(), -i))
 
   const feats = features(s, dates)
   const sig = feats.map((f) => `${f.id}=${f.values.join(',')}`).join('|')

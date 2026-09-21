@@ -5,7 +5,7 @@ import { CHECK_CATALOG, SCALE_LABELS, type CheckTemplate } from '../data/checks'
 import { activeChecks, carriedDefaults, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
-import { addDays, longDate, today } from '../lib/dates'
+import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
@@ -27,7 +27,7 @@ const blankDay = (date: string): DayEntry => ({ date, values: {}, confirmed: fal
 
 export function Today() {
   const { state } = useStore()
-  const [date, setDate] = useState(today())
+  const [date, setDate] = useState(checkerToday())
   const [editing, setEditing] = useState<CheckDef | null>(null)
   const [stats, setStats] = useState<CheckDef | null>(null)
   const [adding, setAdding] = useState(false)
@@ -53,7 +53,7 @@ export function Today() {
     if (!external.length) return
     const ctrl = new AbortController()
     setBrudiState('laden')
-    void fetchBrudi(addDays(today(), -180), ctrl.signal).then((rows) => {
+    void fetchBrudi(addDays(checkerToday(), -180), ctrl.signal).then((rows) => {
       if (ctrl.signal.aborted) return
       setBrudiState(rows.length ? 'idle' : 'fehler')
       if (!rows.length) return
@@ -85,7 +85,7 @@ export function Today() {
    * im Vermerk und holt sich ihre Uebernahme nach, sobald sie da ist.
    */
   useEffect(() => {
-    if (date !== today()) return
+    if (date !== checkerToday()) return
     const day = state.days[date]
     const hatte = new Set(day?.carried ?? [])
     const offen = Object.entries(carried).filter(([id]) => !hatte.has(id) && !isFilled(day?.values[id]))
@@ -98,7 +98,14 @@ export function Today() {
     })
   }, [date, carried, state.days])
 
-  const isToday = date === today()
+  const isToday = date === checkerToday()
+  /**
+   * Zwischen Mitternacht und sechs meint der Checker noch den Vortag. Dann
+   * darf ueber der Seite nicht "heute" stehen — sonst traegt man im guten
+   * Glauben Werte in einen Tag, der auf der Uhr schon vorbei ist. In dem
+   * Fenster steht das Datum da, sonst wie gehabt.
+   */
+  const isWallToday = date === today()
 
   /**
    * Blaettern. Ueber den Tag hinaus geht es nicht — morgen ist noch nicht
@@ -268,13 +275,13 @@ export function Today() {
               </span>
             )}
           </div>
-          <h1 className="display">{isToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
+          <h1 className="display">{isWallToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
         <div className="datepick">
           <button className="arrowbtn" onClick={() => goDay(-1)} aria-label="Tag zurück"><ChevL /></button>
-          <div className="datepick-label">{isToday ? 'Heute' : longDate(date)}</div>
+          <div className="datepick-label">{isWallToday ? 'Heute' : longDate(date)}</div>
           <button className="arrowbtn" disabled={isToday} onClick={() => goDay(1)} aria-label="Tag vor"><ChevR /></button>
-          {!isToday && <button className="btn btn--quiet btn--sm" onClick={() => setDate(today())}>Zurück zu heute</button>}
+          {!isToday && <button className="btn btn--quiet btn--sm" onClick={() => setDate(checkerToday())}>Zurück zu heute</button>}
         </div>
       </div>
 

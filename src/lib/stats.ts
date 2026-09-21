@@ -1,5 +1,5 @@
 import type { AppState, CheckDef } from './types'
-import { addDays, fromISO, today } from './dates'
+import { addDays, fromISO, checkerToday } from './dates'
 import { countedValues, meetsTarget } from './scoring'
 import { numeric } from './insights'
 
@@ -14,7 +14,7 @@ export interface Point {
   met: boolean
 }
 
-export function series(s: AppState, def: CheckDef, days: number, from = today()): Point[] {
+export function series(s: AppState, def: CheckDef, days: number, from = checkerToday()): Point[] {
   const out: Point[] = []
   for (let i = days - 1; i >= 0; i--) {
     const date = addDays(from, -i)

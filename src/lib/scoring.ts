@@ -1,5 +1,5 @@
 import type { AppState, CheckDef, CheckValue, DayEntry } from './types'
-import { addDays, today } from './dates'
+import { addDays, checkerToday } from './dates'
 
 /** Wo die Uhrzeit eines Checks im Tag liegt. Neben dem Wert, nicht darin. */
 export const timeKey = (id: string): string => `${id}@time`
@@ -49,6 +49,10 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
     // Gelesene Rubriken holen ihre Werte selbst — ein Vortagswert waere hier
     // eine Erfindung.
     if (def.kind === 'external') continue
+    // Eine Notiz gehoert zu genau einem Tag. Uebernommen stuende dort heute
+    // wieder "Lange Autofahrt", und man muesste jeden Morgen erst loeschen,
+    // was gestern war. Notizen fangen leer an.
+    if (def.kind === 'text') continue
     let found: CheckValue | undefined
     for (let i = 1; i <= CARRY_WINDOW; i++) {
       // Nur aus bestaetigten Tagen uebernehmen — sonst wird ein Vorschlag
@@ -135,7 +139,7 @@ export function scoreDay(s: AppState, date: string): DayScore {
 }
 
 /** Serie erfasster Tage, rueckwaerts. Der heutige Tag bricht sie nicht, solange er laeuft. */
-export function streak(s: AppState, from = today()): number {
+export function streak(s: AppState, from = checkerToday()): number {
   let n = 0
   let cursor = from
   if (!scoreDay(s, cursor).logged) cursor = addDays(cursor, -1)
@@ -147,7 +151,7 @@ export function streak(s: AppState, from = today()): number {
 }
 
 /** Serie fuer einen einzelnen Check — nur Tage, an denen das Ziel getroffen wurde. */
-export function checkStreak(s: AppState, def: CheckDef, from = today()): number {
+export function checkStreak(s: AppState, def: CheckDef, from = checkerToday()): number {
   let n = 0
   let cursor = from
   if (!meetsTarget(def, countedValues(s, cursor)[def.id])) cursor = addDays(cursor, -1)
@@ -159,7 +163,7 @@ export function checkStreak(s: AppState, def: CheckDef, from = today()): number 
 }
 
 /** Erfuellungsquote der letzten `n` Tage, aeltester Tag zuerst — fuer den Balkenstreifen. */
-export function recentRatios(s: AppState, n: number, from = today()): number[] {
+export function recentRatios(s: AppState, n: number, from = checkerToday()): number[] {
   const out: number[] = []
   for (let i = n - 1; i >= 0; i--) out.push(scoreDay(s, addDays(from, -i)).ratio)
   return out
@@ -170,7 +174,7 @@ export function goalMomentum(s: AppState, goalId: string, days = 30): { hits: nu
   const defs = activeChecks(s).filter((c) => c.goals?.includes(goalId))
   let hits = 0
   for (let i = 0; i < days; i++) {
-    const values = countedValues(s, addDays(today(), -i))
+    const values = countedValues(s, addDays(checkerToday(), -i))
     for (const d of defs) if (meetsTarget(d, values[d.id])) hits++
   }
   return { hits, possible: defs.length * days }

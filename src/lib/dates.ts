@@ -2,6 +2,27 @@ import type { Cadence } from './types'
 
 export const today = (): string => toISO(new Date())
 
+/** Um diese Stunde faengt im Checker der neue Tag an. */
+export const DAY_STARTS_AT = 6
+
+/**
+ * Welchen Tag der Checker gerade meint.
+ *
+ * Um halb zwei nachts ist man noch beim gestrigen Tag — man traegt dann ein,
+ * wann man ins Bett geht, nicht wie der neue Tag war. Um Mitternacht
+ * umzuspringen hiesse, sich mitten in der Auswertung des Abends einen leeren
+ * Tag vorgesetzt zu bekommen. Also wechselt er erst um sechs.
+ *
+ * Nur fuer den Checker und alles, was daraus rechnet — Serie, Statistik,
+ * Zusammenhaenge. Der Kalender in Future Me bleibt beim Datum, das auf der
+ * Uhr steht: was am 21. faellig ist, ist am 21. faellig, auch um eins nachts.
+ */
+export function checkerToday(now = new Date()): string {
+  const d = new Date(now)
+  if (d.getHours() < DAY_STARTS_AT) d.setDate(d.getDate() - 1)
+  return toISO(d)
+}
+
 export function toISO(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
