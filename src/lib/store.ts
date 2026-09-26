@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 11
+const STATE_VERSION = 12
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -235,6 +235,28 @@ export function migrate(s: AppState): AppState {
     // nicht gab — wer `withTime` selbst gesetzt hat, behaelt seine Wahl.
     const sleep = next.find((c) => c.id === 'sleep')
     if (sleep && sleep.withTime === undefined) sleep.withTime = true
+  }
+
+  // Die Skala geht jetzt bis 10 statt bis 5. Aus einer 2 wird eine 4 — das
+  // ist dieselbe Aussage auf der doppelten Achse, und der ganze Bestand
+  // bleibt mit den neuen Eintraegen vergleichbar. Zielwerte wandern mit,
+  // sonst gilt ploetzlich die halbe Latte.
+  //
+  // Verdoppeln statt strecken: 1..5 -> 2,4,6,8,10. Die ungeraden Stufen
+  // waren nie erreichbar und sollen es auch nicht rueckwirkend werden; eine
+  // gestreckte 3,25 waere eine Genauigkeit, die es in den Daten nie gab.
+  if ((s.meta.v ?? 1) < 12) {
+    const scales = new Set(next.filter((c) => c.kind === 'scale').map((c) => c.id))
+    for (const c of next) {
+      if (c.kind !== 'scale') continue
+      if (typeof c.target === 'number') c.target = c.target * 2
+    }
+    for (const day of Object.values(s.days)) {
+      for (const id of scales) {
+        const v = day.values[id]
+        if (typeof v === 'number') day.values[id] = v * 2
+      }
+    }
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

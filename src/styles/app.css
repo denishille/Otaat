@@ -272,11 +272,19 @@ h2.section-title {
 .bool button.yes[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
 /* Scale 1-5 */
-.scale { display: flex; gap: 6px; }
+/* Zehn Stufen. Das Quadrat von frueher geht nicht mehr auf — bei zehn Tasten
+   waere es 28 px hoch und damit kein Ziel mehr, das man auf dem Handy trifft.
+   Also feste Hoehe.
+   Raster statt Umbruch: eine umbrechende Reihe laesst die uebrig gebliebenen
+   Tasten die letzte Zeile ausfuellen, und dann ist die 10 dreimal so breit
+   wie die 3. Zwei mal fuenf ist der Normalfall (die Karten sind mindestens
+   258 px breit, zehn nebeneinander waeren dort 18 px); auf dem Handy, wo die
+   Karte ueber die ganze Breite geht, passen alle zehn in eine Reihe. */
+.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .scale button {
-  flex: 1; aspect-ratio: 1/1; max-height: 40px; border-radius: var(--r-md);
+  min-width: 0; height: 40px; border-radius: var(--r-md);
   border: 1px solid var(--line-strong);
-  font-family: var(--mono); font-size: 13px; color: var(--ink-3);
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-3);
   transition: all .13s;
 }
 .scale button:hover { border-color: var(--ink-3); color: var(--ink); transform: translateY(-2px); }
@@ -1317,6 +1325,7 @@ h2.section-title {
   .today-head { gap: 16px; }
   .today-head > div:last-child { flex-wrap: wrap; }
   .check-grid { grid-template-columns: 1fr; }
+  .scale { grid-template-columns: repeat(10, 1fr); }
   .fm-item { grid-template-columns: auto 1fr; row-gap: 10px; }
   .fm-right { grid-column: 2; }
   .sheet { max-height: 88vh; }

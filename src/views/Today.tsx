@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue, DayEntry } from '../lib/types'
-import { CHECK_CATALOG, SCALE_LABELS, type CheckTemplate } from '../data/checks'
+import { CHECK_CATALOG, SCALE_MAX, scaleLabel, type CheckTemplate } from '../data/checks'
 import { activeChecks, carriedDefaults, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
@@ -473,8 +473,8 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
     case 'scale':
       return (
         <div className="scale">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} aria-pressed={value === n} title={SCALE_LABELS[n - 1]} onClick={() => onChange(value === n ? null : n)}>{n}</button>
+          {Array.from({ length: SCALE_MAX }, (_, i) => i + 1).map((n) => (
+            <button key={n} aria-pressed={value === n} title={scaleLabel(n)} onClick={() => onChange(value === n ? null : n)}>{n}</button>
           ))}
         </div>
       )
@@ -797,7 +797,7 @@ function CheckPicker({ onClose, onOwn }: { onClose: () => void; onOwn: () => voi
 function kindLabel(def: CheckTemplate['def']): string {
   switch (def.kind) {
     case 'bool': return 'Ja / Nein'
-    case 'scale': return 'Skala 1–5'
+    case 'scale': return 'Skala 1–10'
     case 'number': return def.unit ? `Zahl in ${def.unit}` : 'Zahl'
     case 'multi': return 'Mehrfachauswahl'
     case 'choice': return 'Auswahl'
@@ -874,7 +874,7 @@ function Insights({ state }: { state: AppState }) {
 
 const KINDS: { k: CheckKind; label: string }[] = [
   { k: 'bool', label: 'Ja / Nein' },
-  { k: 'scale', label: 'Skala 1–5' },
+  { k: 'scale', label: 'Skala 1–10' },
   { k: 'number', label: 'Zahl' },
   { k: 'choice', label: 'Auswahl' },
   { k: 'multi', label: 'Mehrfachauswahl' },

@@ -48,7 +48,7 @@ export const CHECK_CATALOG: CheckGroup[] = [
         },
         note: 'Optionen frei erweiterbar',
       },
-      { def: { id: 'tense', name: 'Verspannt', kind: 'scale', target: 5, inverse: true } },
+      { def: { id: 'tense', name: 'Verspannt', kind: 'scale', target: 10, inverse: true } },
       { def: { id: 'creatine', name: 'Kreatin', kind: 'bool' } },
       { def: { id: 'minoxidil', name: 'Minoxidil', kind: 'bool' } },
       { def: { id: 'skincare', name: 'Skincare', kind: 'bool' } },
@@ -64,8 +64,8 @@ export const CHECK_CATALOG: CheckGroup[] = [
   {
     title: 'Kopf',
     items: [
-      { def: { id: 'mood', name: 'Happiness', kind: 'scale', target: 4 } },
-      { def: { id: 'focus', name: 'Fokus', kind: 'scale', target: 4 } },
+      { def: { id: 'mood', name: 'Happiness', kind: 'scale', target: 8 } },
+      { def: { id: 'focus', name: 'Fokus', kind: 'scale', target: 8 } },
       { def: { id: 'energy', name: 'Energie', kind: 'scale' } },
       { def: { id: 'meditate', name: 'Meditation', kind: 'bool' } },
     ],
@@ -81,7 +81,7 @@ export const CHECK_CATALOG: CheckGroup[] = [
   {
     title: 'Weniger ist besser',
     items: [
-      { def: { id: 'scroll', name: 'Doomscrolling', kind: 'scale', target: 2, inverse: true } },
+      { def: { id: 'scroll', name: 'Doomscrolling', kind: 'scale', target: 4, inverse: true } },
       { def: { id: 'coffee', name: 'Kaffee', kind: 'number', unit: 'Tassen', step: 1, target: 3, inverse: true } },
       {
         def: { id: 'booze', name: 'Alkohol', kind: 'number', unit: 'Gläser', step: 1, target: 0, inverse: true, fallback: 0 },
@@ -93,7 +93,14 @@ export const CHECK_CATALOG: CheckGroup[] = [
 
 export const CATALOG_CHECKS: CheckTemplate[] = CHECK_CATALOG.flatMap((g) => g.items)
 
-export const SCALE_LABELS = ['mies', 'geht so', 'ok', 'gut', 'stark']
+/** Wie weit die Skala geht. War mal 5 — zehn Stufen treffen genauer, weil
+    zwischen "ok" und "gut" bei fuenf Stufen nichts mehr passt. */
+export const SCALE_MAX = 10
+
+const SCALE_LABELS = ['mies', 'schwach', 'geht so', 'ok', 'ganz ok', 'solide', 'gut', 'stark', 'top', 'bestes']
+
+/** Das Wort zu einer Stufe. Steht als `title` an der Taste. */
+export const scaleLabel = (n: number): string => SCALE_LABELS[n - 1] ?? String(n)
 
 /** Checks, die es mal gab und jetzt nicht mehr. Erfasste Tage bleiben erhalten,
     der Check wandert nur ins Archiv statt geloescht zu werden. */
