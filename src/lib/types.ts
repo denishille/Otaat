@@ -147,5 +147,14 @@ export interface AppState {
         wenige, winzige Eintraege, und meta wird ohnehin mitsynchronisiert. */
     boards: Board[]
     activeBoard: ID
+    /**
+     * Wer man im Kalorienbrudi-Bestand ist. Dort liegen zwei Konten; ohne
+     * die Angabe weiss die Essens-Rubrik nicht, wessen Zahlen sie holen soll.
+     *
+     * Steht in `meta` und nicht im Konto, weil es die App betrifft und nicht
+     * die Anmeldung: es entscheidet, welche Werte in die Tage geschrieben
+     * werden. Und es soll auf allen Geraeten dasselbe sein.
+     */
+    brudiPerson?: string
   }
 }

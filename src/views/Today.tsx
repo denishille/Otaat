@@ -55,15 +55,20 @@ export function Today() {
    */
   const external = defs.filter((d) => d.kind === 'external')
   const brudiDefs = external.filter((d) => d.source === 'brudi')
-  const [brudiState, setBrudiState] = useState<'idle' | 'laden' | 'fehler'>('idle')
+  const [brudiState, setBrudiState] = useState<'idle' | 'laden' | 'fehler' | 'ohne'>('idle')
   const brudiIds = brudiDefs.map((d) => d.id).join(',')
+  const brudiPerson = state.meta.brudiPerson ?? ''
 
   useEffect(() => {
     if (!brudiIds) return
-    const ctrl = new AbortController()
+    // Ohne gewaehltes Konto gibt es nichts zu holen — im Bestand liegen zwei,
+    // und raten waere hier die schlechteste aller Moeglichkeiten.
+    if (!brudiPerson) { setBrudiState('ohne'); return }
+
+    let ab = false
     setBrudiState('laden')
-    void fetchBrudi(addDays(checkerToday(), -180), ctrl.signal).then((rows) => {
-      if (ctrl.signal.aborted) return
+    void fetchBrudi(brudiPerson, addDays(checkerToday(), -180)).then((rows) => {
+      if (ab) return
       setBrudiState(rows.length ? 'idle' : 'fehler')
       if (!rows.length) return
 
@@ -81,9 +86,9 @@ export function Today() {
         }
       })
     })
-    return () => ctrl.abort()
+    return () => { ab = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brudiIds])
+  }, [brudiIds, brudiPerson, userId])
 
   /**
    * Dasselbe vom Ring. Getrennt von der Essens-Quelle, weil es ueber eine
@@ -439,7 +444,7 @@ interface CardProps {
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
   /** nur bei gelesenen Rubriken gesetzt */
-  externalState?: 'idle' | 'laden' | 'fehler'
+  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
 }
 
 function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
@@ -494,7 +499,7 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
   onTime: (v: string) => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
-  externalState?: 'idle' | 'laden' | 'fehler'
+  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
 }) {
   switch (def.kind) {
     case 'external':
@@ -563,14 +568,17 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
 function ExternalValue({ def, value, state }: {
   def: CheckDef
   value: CheckValue
-  state?: 'idle' | 'laden' | 'fehler'
+  state?: 'idle' | 'laden' | 'fehler' | 'ohne'
 }) {
   const n = typeof value === 'number' ? value : null
 
   if (n === null) {
     return (
       <div className="ext ext--empty">
-        {state === 'laden' ? 'wird geholt …' : state === 'fehler' ? 'Quelle nicht erreichbar' : 'für diesen Tag nichts erfasst'}
+        {state === 'laden' ? 'wird geholt …'
+          : state === 'ohne' ? 'kein Kalorienbrudi-Konto gewählt — im Konto einstellen'
+          : state === 'fehler' ? 'Quelle nicht erreichbar'
+          : 'für diesen Tag nichts erfasst'}
       </div>
     )
   }

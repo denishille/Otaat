@@ -1242,6 +1242,9 @@ h2.section-title {
 .acc-v { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
 .acc-name { flex: 1; }
 .acc-name .input { padding: 5px 9px; font-size: 14px; }
+/* Das Konto-Dropdown soll die Zeile nicht ausfuellen — `.select` ist auf
+   volle Breite gebaut, hier steht es neben einer Beschriftung. */
+.acc-pick { width: auto; min-width: 9rem; padding: 5px 9px; font-size: 14px; }
 
 /* Ein Punkt am Konto-Knopf, wenn der Abgleich klemmt. */
 .dot-warn {

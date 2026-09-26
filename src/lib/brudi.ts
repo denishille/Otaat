@@ -1,4 +1,5 @@
-import { BRUDI_FIELDS, BRUDI_KEY, BRUDI_TARGET_COL, BRUDI_URL, BRUDI_VIEW } from '../data/brudi-source'
+import { BRUDI_FIELDS, BRUDI_TARGET_COL, BRUDI_VIEW } from '../data/brudi-source'
+import { supabase } from './supabase'
 
 /* Tageswerte aus dem Kalorienbrudi-Bestand. */
 
@@ -19,25 +20,30 @@ const num = (v: unknown): number | null => {
 const COLUMNS = ['datum', BRUDI_TARGET_COL, ...BRUDI_FIELDS.map((f) => f.col)].join(',')
 
 /**
- * Holt die Tage ab `from`. Wirft nicht — ohne Netz oder bei einem Fehler
- * kommt eine leere Liste zurueck, und die Karte zeigt weiter das, was schon
- * lokal liegt. Die Rubrik soll nicht die ganze Seite mitreissen.
+ * Holt die Tage einer Person ab `from`. Wirft nicht — ohne Netz oder bei
+ * einem Fehler kommt eine leere Liste zurueck, und die Karte zeigt weiter
+ * das, was schon lokal liegt. Die Rubrik soll nicht die ganze Seite
+ * mitreissen.
+ *
+ * Gelesen wird ueber den angemeldeten Client, nicht mehr mit dem
+ * oeffentlichen Schluessel: seit die View beide Konten fuehrt, stehen dort
+ * auch Zahlen, die nicht Denis gehoeren. `anon` kommt nicht mehr an die
+ * View, nur noch `authenticated`.
  *
  * Ein Tag ohne Kalorien ist kein Tag: an dem war drueben nichts eingetragen,
  * und die Naehrwerte waeren dann ohnehin leer.
  */
-export async function fetchBrudi(from: string, signal?: AbortSignal): Promise<BrudiDay[]> {
-  const url =
-    `${BRUDI_URL}/rest/v1/${BRUDI_VIEW}` +
-    `?select=${COLUMNS}&datum=gte.${from}&order=datum.asc`
-
+export async function fetchBrudi(person: string, from: string): Promise<BrudiDay[]> {
+  if (!supabase || !person) return []
   try {
-    const res = await fetch(url, {
-      signal,
-      headers: { apikey: BRUDI_KEY, Authorization: `Bearer ${BRUDI_KEY}` },
-    })
-    if (!res.ok) return []
-    const rows = (await res.json()) as Record<string, unknown>[]
+    const { data, error } = await supabase
+      .from(BRUDI_VIEW)
+      .select(COLUMNS)
+      .eq('person', person)
+      .gte('datum', from)
+      .order('datum', { ascending: true })
+    if (error) return []
+    const rows = (data ?? []) as unknown as Record<string, unknown>[]
 
     const out: BrudiDay[] = []
     for (const r of rows) {
@@ -54,4 +60,15 @@ export async function fetchBrudi(from: string, signal?: AbortSignal): Promise<Br
   } catch {
     return []
   }
+}
+
+/** Welche Konten der Kalorienbrudi-Bestand kennt. Nur Namen. */
+export async function brudiPersonen(): Promise<string[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.from('brudi_personen').select('person')
+  if (error) return []
+  return (data ?? [])
+    .map((r) => String((r as { person: unknown }).person))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'de'))
 }

@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 12
+const STATE_VERSION = 13
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -259,6 +259,14 @@ export function migrate(s: AppState): AppState {
     }
   }
 
+  // Die Essens-Quelle kennt jetzt zwei Konten. Bis hierher stand `Denis` fest
+  // in der View — wer die Rubrik hat, hat also Denis' Zahlen gesehen. Das ist
+  // keine Annahme, sondern der Stand, und er wird festgehalten, damit die
+  // Rubrik nach dem Versionssprung nicht ploetzlich leer dasteht.
+  if ((s.meta.v ?? 1) < 13 && s.meta.brudiPerson === undefined) {
+    if (next.some((c) => c.source === 'brudi')) s.meta.brudiPerson = 'Denis'
+  }
+
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,
   // stehen noch in den Tagen: was irgendwann angehakt wurde und nicht aus dem
   // Regal stammt, kommt zurueck in die Auswahl. Regal-Optionen, die jemand
@@ -293,6 +301,14 @@ export function migrate(s: AppState): AppState {
   }
 
   return { ...s, checks: next, meta: { ...s.meta, v: STATE_VERSION } }
+}
+
+/** Wer man im Kalorienbrudi-Bestand ist. Leer heisst: keine Quelle. */
+export function setBrudiPerson(person: string | null) {
+  update((d) => {
+    if (person) d.meta.brudiPerson = person
+    else delete d.meta.brudiPerson
+  })
 }
 
 export function applyTheme(theme: Theme) {

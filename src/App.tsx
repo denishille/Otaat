@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStore, update, applyTheme, resolvedTheme, signIn, signInWithPassword, setPassword, signOut, pushAll, setUsername, type SyncStatus } from './lib/store'
+import { useStore, update, applyTheme, resolvedTheme, signIn, signInWithPassword, setPassword, signOut, pushAll, setUsername, setBrudiPerson, type SyncStatus } from './lib/store'
 import { cloudEnabled } from './lib/supabase'
 import { Today } from './views/Today'
 import { FutureMe } from './views/FutureMe'
@@ -10,6 +10,7 @@ import { Mark, Moon, Sun } from './components/Icons'
 import { daysBetween, shortDate, today } from './lib/dates'
 import { confirmedDays } from './lib/scoring'
 import { ouraConnected, ouraConnectUrl, ouraDisconnect } from './lib/oura'
+import { brudiPersonen } from './lib/brudi'
 
 type Tab = 'today' | 'future' | 'board'
 
@@ -204,6 +205,10 @@ function Account({ onClose }: { onClose: () => void }) {
               <PasswordField />
             </div>
             <div className="acc-row">
+              <span className="acc-k">Essen</span>
+              <BrudiField current={state.meta.brudiPerson ?? ''} />
+            </div>
+            <div className="acc-row">
               <span className="acc-k">Oura</span>
               <OuraField />
             </div>
@@ -286,6 +291,39 @@ function NameField({ current }: { current: string | null }) {
         onBlur={() => void save()}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
+    </span>
+  )
+}
+
+/**
+ * Welches Kalorienbrudi-Konto die Essens-Rubriken fuellt.
+ *
+ * Im Bestand liegen zwei, und welches davon man ist, kann die App nicht
+ * wissen. Die Namen kommen aus der Datenbank statt aus einer Liste im Code —
+ * kommt drueben einer dazu, steht er hier ohne Aenderung am Bundle.
+ */
+function BrudiField({ current }: { current: string }) {
+  const [namen, setNamen] = useState<string[]>([])
+
+  useEffect(() => { void brudiPersonen().then(setNamen) }, [])
+
+  // Der gespeicherte Name muss in der Liste stehen, auch wenn der Abruf
+  // gerade nicht durchkam — sonst springt die Auswahl beim Oeffnen auf leer.
+  const auswahl = current && !namen.includes(current) ? [current, ...namen] : namen
+
+  return (
+    <span className="acc-v" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <select
+        className="select acc-pick"
+        value={current}
+        onChange={(e) => {
+          setBrudiPerson(e.target.value || null)
+          toast(e.target.value ? `Essen kommt von ${e.target.value}` : 'Essens-Quelle getrennt')
+        }}
+      >
+        <option value="">keins</option>
+        {auswahl.map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
     </span>
   )
 }
