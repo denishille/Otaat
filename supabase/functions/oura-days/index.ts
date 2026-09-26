@@ -15,19 +15,18 @@
  * ---------------------------------------------------------------------------
  * Welcher Wert auf welchen Tag gehoert
  *
- * Oura datiert eine Nacht auf den Tag, an dem man **aufwacht**. OTAAT fuehrt
- * den Schlaf seit jeher auf dem Tag, an dem man **ins Bett geht** — dort steht
- * ja auch die Bettzeit, und der Checker-Tag wechselt aus genau dem Grund erst
- * um sechs Uhr morgens.
+ * Alles liegt auf dem **Oura-Tag**, also dem Tag, an dem man aufwacht.
  *
- * Wer das nicht umrechnet, verschiebt die halbe Zeitreihe um einen Tag, und
- * der Zusammenhang-Finder sucht danach Effekte, die es nur durch den Versatz
- * gibt. Also:
+ * Das war eine Weile andersherum: die Nacht lag auf dem Tag des Zubettgehens,
+ * weil die Rubrik von Hand gefuehrt wurde und dort die Frage stand, wann man
+ * ins Bett geht. Seit der Ring sie fuellt, ist das verkehrt herum — man sieht
+ * morgens nach, was die Nacht gebracht hat, und findet ein leeres Feld, weil
+ * der Schlaf auf gestern liegt. Oura und jede andere Schlaf-App legen eine
+ * Nacht auf den Morgen danach.
  *
- *   Schlaf-Sitzung (Dauer, Bettzeit, HRV, Ruhepuls, Tief/REM, Effizienz)
- *     -> Checker-Tag des **Zubettgehens**
- *   Schlaf-Score  -> derselbe Tag wie die Nacht, die er bewertet
- *   Readiness, Schritte, Aktivitaet -> der Oura-Tag, das ist der wache Tag
+ * Die Uhrzeiten bleiben, was sie sind: `ab 23:42` und `bis 07:12` stehen
+ * beide auf dem Tag des Aufwachens, auch wenn 23:42 kalendarisch davor liegt.
+ * Eine Nacht ist ein Eintrag.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -43,26 +42,6 @@ const CORS = {
     'authorization, x-client-info, x-supabase-api-version, apikey, content-type',
   'Access-Control-Max-Age': '86400',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-/** Ab dieser Stunde faengt der Checker-Tag an. Gleich gehalten mit `dates.ts`. */
-const DAY_STARTS_AT = 6
-
-const pad = (n: number) => String(n).padStart(2, '0')
-
-/**
- * Der Checker-Tag zu einem Zeitpunkt mit Zeitzonen-Versatz, so wie Oura ihn
- * liefert ("2026-09-21T23:15:00+02:00"). Gerechnet wird in der **oertlichen**
- * Zeit des Zeitstempels, nicht in UTC: 23:15 Ortszeit ist der Abend des 21.,
- * auch wenn UTC da schon den 22. schreibt.
- */
-function checkerDayOf(stamp: string): string | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(stamp)
-  if (!m) return null
-  const [, y, mo, d, h] = m
-  const dt = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)))
-  if (Number(h) < DAY_STARTS_AT) dt.setUTCDate(dt.getUTCDate() - 1)
-  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`
 }
 
 /** "2026-09-21T23:15:00+02:00" -> "23:15" */
@@ -184,17 +163,13 @@ Deno.serve(async (req) => {
     ;(days[tag] ??= {})[key] = v
   }
 
-  /* Oura-Tag -> Checker-Tag des Zubettgehens. Fuellt sich aus den Sitzungen
-     und traegt danach den Schlaf-Score an die richtige Stelle. */
-  const bettTag: Record<string, string> = {}
-
   for (const s of sessions) {
     // Nickerchen sind kein Nachtschlaf und haetten in der Dauer nichts verloren.
     if (s.type && s.type !== 'long_sleep' && s.type !== 'sleep') continue
     const start = String(s.bedtime_start ?? '')
-    const tag = checkerDayOf(start)
-    if (!tag) continue
-    if (s.day) bettTag[String(s.day)] = tag
+    // Der Oura-Tag der Sitzung ist der Morgen danach. Genau dort gehoert sie hin.
+    const tag = s.day ? String(s.day) : null
+    if (!tag || !start) continue
 
     // Auf die Minute genau, nicht auf die Zehntelstunde: die Karte zeigt
     // "7 h 43 min", und 0,1 h waere dort ein Sprung von sechs Minuten.
@@ -224,8 +199,7 @@ Deno.serve(async (req) => {
   }
 
   for (const d of sleepScores) {
-    const oura = String(d.day ?? '')
-    put(bettTag[oura] ?? null, 'oura_sleep_score', Number(d.score ?? NaN))
+    put(String(d.day ?? '') || null, 'oura_sleep_score', Number(d.score ?? NaN))
   }
 
   for (const d of readiness) {

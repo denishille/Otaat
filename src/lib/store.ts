@@ -3,11 +3,12 @@ import type { AppState, Board, BoardEdge, BoardFrame, BoardNode, CheckDef, DayEn
 import { CATALOG_CHECKS, RETIRED_CHECK_IDS } from '../data/checks'
 import { supabase, cloudEnabled } from './supabase'
 import { SUPABASE_URL, T } from '../data/otaat-source'
+import { addDays } from './dates'
 
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 17
+const STATE_VERSION = 18
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -320,6 +321,46 @@ export function migrate(s: AppState): AppState {
       const hh = String(Math.floor(ende / 60)).padStart(2, '0')
       const mm = String(ende % 60).padStart(2, '0')
       day.values['sleep@end'] = `${hh}:${mm}`
+    }
+  }
+
+  // Eine Nacht liegt jetzt auf dem Morgen danach, nicht auf dem Abend davor.
+  //
+  // Solange der Schlaf von Hand kam, war der Abend richtig — dort stand ja die
+  // Frage, wann man ins Bett geht. Seit der Ring ihn fuellt, ist es verkehrt
+  // herum: man sieht morgens nach, was die Nacht gebracht hat, und findet ein
+  // leeres Feld, weil der Schlaf auf gestern liegt.
+  //
+  // Verschoben wird **nur, was der Ring geschrieben hat** — erkennbar an den
+  // Werten, die es von Hand gar nicht geben kann (HRV, Schlaf-Score,
+  // Effizienz). Die Handeintraege aus der Zeit davor bleiben liegen, wo sie
+  // sind. Von hinten nach vorn, damit kein Tag einen ueberschreibt, der noch
+  // dran ist.
+  if ((s.meta.v ?? 1) < 18) {
+    const nacht = ['sleep', 'sleep@time', 'sleep@end', 'oura_in_bed', 'oura_deep',
+      'oura_rem', 'oura_light', 'oura_awake', 'oura_latency', 'oura_efficiency',
+      'oura_hrv', 'oura_rhr', 'oura_breath', 'oura_sleep_score']
+    const vomRing = (d: DayEntry) =>
+      ['oura_hrv', 'oura_sleep_score', 'oura_efficiency', 'oura_deep', 'oura_rem']
+        .some((k) => d.values[k] !== undefined)
+
+    const tage = Object.keys(s.days).sort().reverse()
+    for (const datum of tage) {
+      const day = s.days[datum]
+      if (!vomRing(day)) continue
+      const ziel = (s.days[addDays(datum, 1)] ??= { date: addDays(datum, 1), values: {}, confirmed: false })
+      for (const k of nacht) {
+        if (day.values[k] === undefined) continue
+        ziel.values[k] = day.values[k]
+        delete day.values[k]
+      }
+      // Der Vermerk wandert mit: was am alten Tag verworfen war, ist es auch
+      // am neuen.
+      const weg = (day.dropped ?? []).filter((k) => nacht.includes(k))
+      if (weg.length) {
+        ziel.dropped = [...new Set([...(ziel.dropped ?? []), ...weg])]
+        day.dropped = (day.dropped ?? []).filter((k) => !nacht.includes(k))
+      }
     }
   }
 
