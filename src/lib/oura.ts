@@ -22,6 +22,31 @@ export interface OuraAnswer {
 const leer: OuraAnswer = { connected: false, days: [] }
 
 /**
+ * Die Meldung aus der Function herausholen.
+ *
+ * Bei einem Fehlercode gibt supabase-js nur "Edge Function returned a non-2xx
+ * status code" zurueck — der Rumpf, in dem der eigentliche Grund auf Deutsch
+ * steht, haengt unter `context`. Ohne das hier steht in der App eine Zeile,
+ * mit der niemand etwas anfangen kann.
+ */
+async function grund(error: unknown): Promise<string> {
+  const ctx = (error as { context?: unknown })?.context
+  if (ctx instanceof Response) {
+    try {
+      const body = await ctx.clone().json() as { error?: string }
+      if (body?.error) return body.error
+    } catch { /* kein JSON — dann bleibt die Standardmeldung */ }
+  }
+  const msg = error instanceof Error ? error.message : String(error)
+  // Der haeufigste Fall, und als Satz voellig unbrauchbar: der Aufruf hat die
+  // Function gar nicht erreicht. Netz weg, oder CORS.
+  if (msg.includes('Failed to send a request')) {
+    return 'Der Server war nicht erreichbar.'
+  }
+  return msg
+}
+
+/**
  * Holt die Tage ab `from`. Wirft nicht — ohne Netz oder bei einem Fehler
  * bleibt stehen, was schon lokal liegt.
  */
@@ -29,7 +54,7 @@ export async function fetchOura(from: string, to: string): Promise<OuraAnswer> {
   if (!supabase) return leer
   try {
     const { data, error } = await supabase.functions.invoke('oura-days', { body: { from, to } })
-    if (error) return { ...leer, error: error.message }
+    if (error) return { ...leer, error: await grund(error) }
     return (data as OuraAnswer) ?? leer
   } catch (e) {
     return { ...leer, error: e instanceof Error ? e.message : String(e) }
@@ -45,7 +70,7 @@ export async function ouraConnectUrl(): Promise<{ url?: string; error?: string }
   if (!supabase) return { error: 'Ohne Konto geht das nicht.' }
   try {
     const { data, error } = await supabase.functions.invoke('oura-connect', { body: {} })
-    if (error) return { error: error.message }
+    if (error) return { error: await grund(error) }
     const url = (data as { url?: string; error?: string })?.url
     return url ? { url } : { error: (data as { error?: string })?.error ?? 'Unbekannter Fehler.' }
   } catch (e) {
@@ -65,7 +90,7 @@ export async function ouraConnected(): Promise<string | null> {
 export async function ouraDisconnect(): Promise<string | null> {
   if (!supabase) return 'Ohne Konto geht das nicht.'
   const { error } = await supabase.functions.invoke('oura-days', { body: { disconnect: true } })
-  return error ? error.message : null
+  return error ? await grund(error) : null
 }
 
 /**

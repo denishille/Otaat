@@ -34,7 +34,14 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+  // `x-client-info` und `x-supabase-api-version` schickt der Supabase-Client
+  // bei jedem Aufruf mit. Fehlen sie hier, beantwortet der Vorab-Check (OPTIONS)
+  // zwar mit 200, aber der Browser verwirft danach den eigentlichen Aufruf —
+  // in der App steht dann "Failed to send a request to the Edge Function", und
+  // im Protokoll steht ein OPTIONS ohne jedes POST dahinter.
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-api-version, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 

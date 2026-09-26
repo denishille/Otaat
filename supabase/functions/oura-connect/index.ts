@@ -18,7 +18,14 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+  // `x-client-info` und `x-supabase-api-version` schickt der Supabase-Client
+  // bei jedem Aufruf mit. Fehlen sie hier, beantwortet der Vorab-Check (OPTIONS)
+  // zwar mit 200, aber der Browser verwirft danach den eigentlichen Aufruf —
+  // in der App steht dann "Failed to send a request to the Edge Function", und
+  // im Protokoll steht ein OPTIONS ohne jedes POST dahinter.
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-api-version, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -37,7 +44,9 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get('OURA_CLIENT_ID')
   const redirect = Deno.env.get('OURA_REDIRECT_URI')
-  if (!clientId || !redirect) return json({ error: 'Oura ist auf dem Server nicht eingerichtet.' }, 500)
+  if (!clientId || !redirect) {
+    return json({ error: 'Auf dem Server fehlen die Oura-Zugangsdaten (OURA_CLIENT_ID / OURA_REDIRECT_URI).' }, 500)
+  }
 
   const auth = req.headers.get('Authorization') ?? ''
   const jwt = auth.startsWith('Bearer ') ? auth.slice(7) : ''
