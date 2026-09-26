@@ -1,6 +1,7 @@
 import type { AppState, CheckDef, CheckValue, DayEntry } from './types'
 import { addDays, checkerToday } from './dates'
 import { HIDDEN_KEYS } from '../data/measured'
+import { CATALOG_CHECKS } from '../data/checks'
 
 /** Wo die Uhrzeit eines Checks im Tag liegt. Neben dem Wert, nicht darin. */
 export const timeKey = (id: string): string => `${id}@time`
@@ -114,6 +115,40 @@ export function countedValues(s: AppState, date: string): Record<string, CheckVa
  */
 export const confirmedDays = (s: AppState): number =>
   Object.values(s.days).filter((d) => d.confirmed).length
+
+/**
+ * Die Rubriken einer verbundenen Quelle nachtragen.
+ *
+ * Wer den Ring verbindet oder sein Essens-Konto waehlt, will dessen Werte
+ * sehen — sie danach noch einzeln im Regal zu suchen, ist ein Schritt zu
+ * viel, und ohne ihn steht die Verbindung da und tut scheinbar nichts.
+ *
+ * Was man rausgeworfen hat, bleibt draussen: `meta.droppedChecks` haelt das
+ * fest. Sonst waere das hier dieselbe Falle wie damals bei den
+ * Sport-Optionen, die nach jedem Loeschen wiederkamen.
+ *
+ * Gibt zurueck, was dazugekommen ist — fuer die Meldung.
+ */
+export function ensureSourceChecks(d: AppState, source: 'brudi' | 'oura'): string[] {
+  const da = new Set(d.checks.map((c) => c.id))
+  const raus = new Set(d.meta.droppedChecks ?? [])
+  const fehlt = CATALOG_CHECKS.filter(
+    (t) => t.def.source === source && !da.has(t.def.id) && !raus.has(t.def.id),
+  )
+  if (!fehlt.length) return []
+  let sort = Math.max(0, ...d.checks.map((c) => c.sort))
+  for (const t of fehlt) {
+    sort += 10
+    d.checks.push({ ...t.def, sort })
+  }
+  return fehlt.map((t) => t.def.name)
+}
+
+/** Merkt sich, dass eine Rubrik absichtlich weg ist. */
+export function dropCheck(d: AppState, id: string) {
+  d.checks = d.checks.filter((c) => c.id !== id)
+  d.meta.droppedChecks = [...new Set([...(d.meta.droppedChecks ?? []), id])]
+}
 
 export const activeChecks = (s: AppState): CheckDef[] =>
   s.checks.filter((c) => !c.archived).sort((a, b) => a.sort - b.sort)

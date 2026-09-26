@@ -156,5 +156,14 @@ export interface AppState {
      * werden. Und es soll auf allen Geraeten dasselbe sein.
      */
     brudiPerson?: string
+    /**
+     * Rubriken, die man ausdruecklich rausgeworfen hat.
+     *
+     * Braucht es, seit eine verbundene Quelle ihre Rubriken selbst nachtraegt:
+     * ohne den Vermerk kaeme die Schritte-Karte nach jedem Loeschen beim
+     * naechsten Start zurueck — genau der Fehler, der die Sport-Optionen
+     * schon einmal gekostet hat.
+     */
+    droppedChecks?: ID[]
   }
 }

@@ -550,6 +550,12 @@ function mergeIn(local: AppState, remote: AppState): AppState {
     meta: {
       ...remote.meta,
       boards: byId(local.meta.boards, remote.meta.boards),
+      // Rausgeworfene Rubriken werden vereinigt, nicht ersetzt. Beim Rest des
+      // meta gewinnt der Server, aber hier waere das falsch herum: wer auf dem
+      // Handy die Schritte-Karte loescht, bekaeme sie beim naechsten Abgleich
+      // zurueck, weil die verbundene Quelle sie dann wieder nachtraegt. Ein
+      // Rauswurf ist eine Entscheidung und gilt ueberall.
+      droppedChecks: [...new Set([...(local.meta.droppedChecks ?? []), ...(remote.meta.droppedChecks ?? [])])],
     },
   }
 }

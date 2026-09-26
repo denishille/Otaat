@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue, DayEntry } from '../lib/types'
 import { CHECK_CATALOG, SCALE_MAX, scaleLabel, type CheckTemplate } from '../data/checks'
-import { activeChecks, carriedDefaults, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
+import { activeChecks, carriedDefaults, dropCheck, ensureSourceChecks, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, checkerToday, today } from '../lib/dates'
@@ -77,13 +77,18 @@ export function Today() {
       const wanted = new Set(brudiIds.split(','))
 
       update((d) => {
+        // Steht ein Konto, gehoeren auch die Makros dazu. Was rausgeworfen
+        // wurde, bleibt draussen.
+        const neu = ensureSourceChecks(d, 'brudi')
+        const nimm = new Set([...wanted, ...d.checks.filter((c) => c.source === 'brudi').map((c) => c.id)])
         for (const row of rows) {
           const day = (d.days[row.date] ??= blankDay(row.date))
           for (const [key, v] of Object.entries(row.values)) {
-            if (!wanted.has(key) && !BRUDI_HIDDEN_KEYS.has(key)) continue
+            if (!nimm.has(key) && !BRUDI_HIDDEN_KEYS.has(key)) continue
             if (day.values[key] !== v) day.values[key] = v
           }
         }
+        if (neu.length) setTimeout(() => toast(`${neu.join(', ')} dazu`), 0)
       })
     })
     return () => { ab = true }
@@ -102,16 +107,50 @@ export function Today() {
    * Feld frueh am Morgen leer und der Ring traegt es ein — genau das war der
    * Wunsch. Dasselbe gilt fuer die Bettzeit.
    */
+  /*
+   * Wann neu gefragt wird.
+   *
+   * Beim Laden reicht nicht: das Verbinden passiert in einem zweiten Tab, und
+   * wenn man von dort zurueckkommt, hat sich am Zustand der App nichts
+   * geaendert — der Effekt lief nie wieder, die Verbindung stand, und im
+   * Checker war trotzdem nichts zu sehen. Also auch, wenn die Seite wieder
+   * nach vorn kommt.
+   */
+  const [ouraTick, setOuraTick] = useState(0)
+  const ouraZuletzt = useRef(0)
   useEffect(() => {
-    if (!userId || !defs.some((d) => d.source === 'oura' || d.id === 'sleep')) return
+    // Nicht bei jedem Tabwechsel: 180 Tage sind vier Abrufe drueben, und
+    // Oura zaehlt mit. Fuenf Minuten sind fuer "gerade verbunden" schnell
+    // genug und fuer den Rest des Tages ruhig genug.
+    const wach = () => {
+      if (document.hidden) return
+      if (Date.now() - ouraZuletzt.current < 5 * 60_000) return
+      ouraZuletzt.current = Date.now()
+      setOuraTick((n) => n + 1)
+    }
+    document.addEventListener('visibilitychange', wach)
+    window.addEventListener('focus', wach)
+    return () => {
+      document.removeEventListener('visibilitychange', wach)
+      window.removeEventListener('focus', wach)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!userId) return
     let ab = false
     void fetchOura(addDays(checkerToday(), -180), checkerToday()).then((res) => {
-      if (ab || !res.days.length) return
-      update((d) => applyOuraDays(d, res.days, blankDay))
+      if (ab || !res.connected) return
+      update((d) => {
+        // Der Ring ist verbunden — dann gehoeren seine Rubriken auch her.
+        const neu = ensureSourceChecks(d, 'oura')
+        applyOuraDays(d, res.days, blankDay)
+        if (neu.length) setTimeout(() => toast(`${neu.join(', ')} dazu`), 0)
+      })
     })
     return () => { ab = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ouraTick])
 
   /**
    * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,
@@ -761,7 +800,9 @@ function CheckPicker({ onClose, onOwn }: { onClose: () => void; onOwn: () => voi
      was man sonst nicht sieht — dass naemlich gerade nichts passiert ist. */
   function toggle(tpl: CheckTemplate) {
     if (byId.has(tpl.def.id)) {
-      update((d) => { d.checks = d.checks.filter((c) => c.id !== tpl.def.id) })
+      // Ueber `dropCheck`, damit eine verbundene Quelle sie nicht beim
+      // naechsten Start wieder nachtraegt.
+      update((d) => dropCheck(d, tpl.def.id))
       return
     }
     if (drin(tpl)) {
@@ -959,7 +1000,7 @@ function CheckEditor({ def, goals, onClose }: { def: CheckDef | null; goals: { i
 
   const remove = () => {
     if (!def) return
-    update((d) => { d.checks = d.checks.filter((c) => c.id !== def.id) })
+    update((d) => dropCheck(d, def.id))
     toast(`„${def.name}" entfernt`)
     onClose()
   }
