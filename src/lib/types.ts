@@ -78,6 +78,14 @@ export interface DayEntry {
    * ihre Uebernahme deshalb nach.
    */
   carried?: ID[]
+  /**
+   * Gemessene Werte, die man fuer diesen Tag weggeworfen hat.
+   *
+   * Der Ring meldet auch Tage, an denen er nur nachts am Finger war — acht
+   * Schritte, und der Schnitt ist hin. Ohne diesen Vermerk waere das Loeschen
+   * sinnlos: der naechste Abruf traegt den Wert wieder ein.
+   */
+  dropped?: ID[]
 }
 
 /* ---------- Future Me Problems ---------- */

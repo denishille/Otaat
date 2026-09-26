@@ -39,9 +39,9 @@ export function useSwipe({ onLeft, onRight }: Opts) {
       if (e.touches.length !== 1) return
       const el = e.target as HTMLElement | null
       // Ein offenes Blatt hat seine eigene Bedienung. Und wo man etwas
-      // eintraegt oder eine Karte am Griff verschiebt, ist ein waagerechter
-      // Zug alles Moegliche, nur kein Blaettern.
-      if (el?.closest('.scrim, input, textarea, select, .grip')) return
+      // eintraegt, eine Karte am Griff verschiebt oder ueber eine Skala
+      // faehrt, ist ein waagerechter Zug alles Moegliche, nur kein Blaettern.
+      if (el?.closest('.scrim, input, textarea, select, .grip, .scale')) return
       const p = e.touches[0]
       x = p.clientX
       y = p.clientY

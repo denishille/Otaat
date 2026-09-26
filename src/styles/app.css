@@ -318,37 +318,40 @@ h2.section-title {
    wie die 3. Zwei mal fuenf ist der Normalfall (die Karten sind mindestens
    258 px breit, zehn nebeneinander waeren dort 18 px); auf dem Handy, wo die
    Karte ueber die ganze Breite geht, passen alle zehn in eine Reihe. */
-.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.scale {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+  /* Senkrecht soll die Seite weiter scrollen, waagerecht gehoert die Geste
+     der Skala. Ohne das faengt der Browser den Zug ab, bevor er ankommt. */
+  touch-action: pan-y;
+}
 .scale button {
   min-width: 0; height: 40px; border-radius: var(--r-md);
   border: 1px solid var(--line-strong);
   font-family: var(--mono); font-size: 12.5px; color: var(--ink-3);
   transition: all .13s;
 }
+.scale button { pointer-events: none; }
 .scale button:hover { border-color: var(--ink-3); color: var(--ink); transform: translateY(-2px); }
 .scale button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
 /* Dauer: zwei Felder mit Einheit dahinter. Kein Plus/Minus — bei Minuten
    waere die Schrittweite entweder zu grob oder man tippt ewig. */
-.duration { display: flex; gap: 8px; }
-.duration label {
-  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 7px;
+.duration {
+  display: flex; align-items: center; gap: 8px;
   border: 1px solid var(--line-strong); border-radius: var(--r-md);
-  background: var(--surface); padding: 0 11px 0 0; height: 44px;
+  background: var(--surface); padding: 0 13px 0 0; height: 44px;
   transition: border-color .15s, box-shadow .15s;
 }
-.duration label:focus-within { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash); }
+.duration:focus-within { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash); }
 .duration input {
-  flex: 1 1 0; min-width: 0; height: 100%; padding: 0 0 0 11px;
+  flex: 1 1 0; min-width: 0; height: 100%; padding: 0 0 0 13px;
   background: none; border: 0; outline: none; color: var(--ink);
-  font-family: var(--mono); font-size: 17px; text-align: right;
-  -moz-appearance: textfield;
+  font-family: var(--mono); font-size: 19px; letter-spacing: .01em;
+  font-variant-numeric: tabular-nums;
 }
-.duration input::-webkit-outer-spin-button,
-.duration input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .duration span {
-  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
-  text-transform: uppercase; letter-spacing: .04em;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
 }
 
 /* Number stepper */

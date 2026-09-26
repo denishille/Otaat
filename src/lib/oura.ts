@@ -113,7 +113,10 @@ export function applyOuraDays(
   let geschrieben = 0
   for (const row of days) {
     const day = (draft.days[row.date] ??= leererTag(row.date))
+    const weg = new Set(day.dropped ?? [])
     for (const [key, v] of Object.entries(row.values)) {
+      // Was fuer diesen Tag weggeworfen wurde, kommt nicht wieder.
+      if (weg.has(key)) continue
       if (day.values[key] === v) continue
       day.values[key] = v
       geschrieben++

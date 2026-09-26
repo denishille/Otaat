@@ -84,7 +84,9 @@ export function Today() {
         const nimm = new Set([...wanted, ...d.checks.filter((c) => c.source === 'brudi').map((c) => c.id)])
         for (const row of rows) {
           const day = (d.days[row.date] ??= blankDay(row.date))
+          const weg = new Set(day.dropped ?? [])
           for (const [key, v] of Object.entries(row.values)) {
+            if (weg.has(key)) continue
             if (!nimm.has(key) && !BRUDI_HIDDEN_KEYS.has(key)) continue
             if (day.values[key] !== v) day.values[key] = v
           }
@@ -214,6 +216,31 @@ export function Today() {
       // Einmal von Hand angefasst heisst: nicht wieder ueberschreiben.
       day.carried = [...new Set([...(day.carried ?? []), key])]
     })
+  }
+
+  /**
+   * Einen gemessenen Wert fuer diesen Tag wegwerfen.
+   *
+   * Der Ring meldet auch Tage, an denen er nur nachts am Finger war. Acht
+   * Schritte sind dann kein Messwert, sondern ein Artefakt, und im Schnitt
+   * richtet es mehr Schaden an, als es Information bringt. Der Vermerk
+   * bleibt, sonst traegt ihn der naechste Abruf wieder ein.
+   */
+  function dropValue(def: CheckDef) {
+    update((d) => {
+      const day = (d.days[date] ??= blankDay(date))
+      delete day.values[def.id]
+      day.dropped = [...new Set([...(day.dropped ?? []), def.id])]
+    })
+    toast(`„${def.name}" für diesen Tag verworfen`)
+  }
+
+  function undropValue(def: CheckDef) {
+    update((d) => {
+      const day = d.days[date]
+      if (day) day.dropped = (day.dropped ?? []).filter((k) => k !== def.id)
+    })
+    toast('kommt beim nächsten Abruf wieder')
   }
 
   function setValue(def: CheckDef, value: CheckValue) {
@@ -457,6 +484,9 @@ export function Today() {
             onRemoveOption={(o) => removeOption(def, o)}
             externalState={def.kind === 'external' ? brudiState : undefined}
             dayValues={entry?.values}
+            dropped={(entry?.dropped ?? []).includes(def.id)}
+            onDrop={() => dropValue(def)}
+            onUndrop={() => undropValue(def)}
           />
         ))}
 
@@ -632,12 +662,16 @@ interface CardProps {
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
   /** nur bei gelesenen Rubriken gesetzt */
-  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne' | 'verworfen'
   /** Alle Werte des Tages — die Kalorien-Kachel zeigt die Makros mit an. */
   dayValues?: Record<string, CheckValue>
+  /** Fuer diesen Tag weggeworfen? Nur bei gelesenen Rubriken. */
+  dropped?: boolean
+  onDrop?: () => void
+  onUndrop?: () => void
 }
 
-function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, endTime, onEndTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, endTime, onEndTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues, dropped, onDrop, onUndrop }: CardProps) {
   const filled = isFilled(value)
 
   /**
@@ -646,7 +680,11 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
    * seinen eigenen Klick: Knoepfe, Felder, der Griff zum Verschieben.
    */
   const openFromCard = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, input, textarea, select, label, a')) return
+    // `.scale` muss mit in die Liste: die Tasten darin nehmen keine Ereignisse
+    // mehr an (sonst gaebe es kein Ziehen), also landet der Klick auf dem
+    // Behaelter — und der ist ein div, das ohne diesen Zusatz als "irgendwo
+    // auf die Kachel" durchginge.
+    if ((e.target as HTMLElement).closest('button, input, textarea, select, label, a, .scale')) return
     onOpen()
   }
 
@@ -662,11 +700,15 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
           {/* Bei einer Dauer stehen die Einheiten schon an den Feldern; oben
               noch einmal "h" waere neben "7 h 43 min" schlicht falsch. */}
           {def.unit && !def.asDuration && <span className="check-unit">{def.unit}</span>}
+          {/* Nur bei Gemessenem und nur, wenn fuer heute etwas dasteht. */}
+          {def.kind === 'external' && (dropped
+            ? <button className="iconbtn" onClick={onUndrop} aria-label="Wert zurückholen" title="Wert zurückholen"><Plus /></button>
+            : isFilled(value) && <button className="iconbtn" onClick={onDrop} aria-label="Wert verwerfen" title="Wert für diesen Tag verwerfen"><Trash /></button>)}
           <button className="grip" onPointerDown={onGrip} aria-label="Verschieben" title="Verschieben"><Grip /></button>
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} endTime={endTime} onEndTime={onEndTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} dayValues={dayValues} />
+      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} endTime={endTime} onEndTime={onEndTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={dropped ? 'verworfen' : externalState} dayValues={dayValues} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -693,7 +735,7 @@ function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOp
   onEndTime: (v: string) => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
-  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  externalState?: 'idle' | 'laden' | 'fehler' | 'ohne' | 'verworfen'
   dayValues?: Record<string, CheckValue>
 }) {
   switch (def.kind) {
@@ -707,47 +749,17 @@ function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOp
         </div>
       )
     case 'scale':
-      return (
-        <div className="scale">
-          {Array.from({ length: SCALE_MAX }, (_, i) => i + 1).map((n) => (
-            <button key={n} aria-pressed={value === n} title={scaleLabel(n)} onClick={() => onChange(value === n ? null : n)}>{n}</button>
-          ))}
-        </div>
-      )
+      return <ScaleInput value={value} onChange={onChange} />
     case 'number': {
       const step = def.step ?? 1
       const num = typeof value === 'number' ? value : null
 
-      // Eine Dauer tippt man nicht als Kommazahl. Zwei Felder, Stunden und
-      // Minuten; gespeichert bleiben Stunden, auf die Minute genau gerundet.
+      // Eine Dauer in einem Feld: 7:43. Zwei Felder waren ein Feld zu viel —
+      // man tippt die Stunde, springt, tippt die Minuten.
       if (def.asDuration) {
-        const gesamt = num === null ? null : Math.round(num * 60)
-        const setze = (h: number | null, m: number | null) => {
-          if (h === null && m === null) { onChange(null); return }
-          onChange(Math.round(((h ?? 0) * 60 + (m ?? 0))) / 60)
-        }
-        const h = gesamt === null ? '' : String(Math.floor(gesamt / 60))
-        const m = gesamt === null ? '' : String(gesamt % 60)
         return (
           <>
-            <div className="duration">
-              <label>
-                <input
-                  type="number" inputMode="numeric" min={0} max={24} placeholder="–"
-                  value={h}
-                  onChange={(e) => setze(e.target.value === '' ? null : Number(e.target.value), gesamt === null ? 0 : gesamt % 60)}
-                />
-                <span>h</span>
-              </label>
-              <label>
-                <input
-                  type="number" inputMode="numeric" min={0} max={59} placeholder="–"
-                  value={m}
-                  onChange={(e) => setze(gesamt === null ? 0 : Math.floor(gesamt / 60), e.target.value === '' ? null : Number(e.target.value))}
-                />
-                <span>min</span>
-              </label>
-            </div>
+            <DurationInput value={num} onChange={onChange} />
             {def.withTime && (
               <div className="timespan">
                 <label className="timefield">
@@ -814,11 +826,153 @@ function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOp
   }
 }
 
+/**
+ * Eine Dauer in einem Feld.
+ *
+ * Angezeigt wird `7:43`. Eingetippt werden darf mehr, weil es keinen Grund
+ * gibt, jemanden auf eine Schreibweise festzunageln: `7:43`, `7`, `7,5`,
+ * `7.5`, `7h43`, `7 43`. Was nicht zu lesen ist, bleibt stehen, bis das Feld
+ * den Fokus verliert — sonst springt einem die Eingabe beim Tippen weg.
+ */
+function DurationInput({ value, onChange }: { value: number | null; onChange: (v: CheckValue) => void }) {
+  const zeige = (h: number | null) => {
+    if (h === null) return ''
+    const min = Math.round(h * 60)
+    return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`
+  }
+
+  const [text, setText] = useState(() => zeige(value))
+  const getippt = useRef(false)
+
+  // Kommt der Wert von aussen — vom Ring, oder weil der Tag gewechselt hat —,
+  // muss das Feld nachziehen. Waehrend man selbst tippt aber nicht.
+  useEffect(() => {
+    if (!getippt.current) setText(zeige(value))
+  }, [value])
+
+  function lesen(roh: string): number | null | undefined {
+    const t = roh.trim().toLowerCase().replace(/\s+/g, '')
+    if (!t) return null
+    let m = /^(\d{1,2})[:h](\d{1,2})?(?:m|min)?$/.exec(t)
+    if (m) {
+      const min = Number(m[2] ?? 0)
+      if (min > 59) return undefined
+      return (Number(m[1]) * 60 + min) / 60
+    }
+    m = /^(\d{1,2})[.,](\d+)$/.exec(t)
+    if (m) return Math.round(Number(`${m[1]}.${m[2]}`) * 60) / 60
+    m = /^(\d{1,2})h?$/.exec(t)
+    if (m) return Number(m[1])
+    return undefined
+  }
+
+  return (
+    <label className="duration">
+      <input
+        type="text" inputMode="numeric" placeholder="–"
+        value={text}
+        onFocus={() => { getippt.current = true }}
+        onChange={(e) => {
+          setText(e.target.value)
+          const v = lesen(e.target.value)
+          if (v !== undefined) onChange(v)
+        }}
+        onBlur={() => {
+          getippt.current = false
+          const v = lesen(text)
+          // Unlesbares zurueck auf den letzten gueltigen Stand.
+          setText(zeige(v === undefined ? value : v))
+        }}
+      />
+      <span>h : min</span>
+    </label>
+  )
+}
+
+/**
+ * Die Skala. Tippen geht, Ziehen auch.
+ *
+ * Zehn Tasten sind auf dem Handy 28 Pixel breit — einzeln zu treffen ist
+ * machbar, aber niemand tippt sich zur richtigen Zahl vor. Mit dem Finger
+ * drueberzufahren ist der natuerlichere Weg, und die Zahl geht mit.
+ *
+ * Die Taste unter dem Finger wird aus den Rechtecken gesucht, nicht aus der
+ * Breite gerechnet: auf breiten Karten stehen die zehn in zwei Reihen, und
+ * ein Dreisatz ueber die Gesamtbreite laege dort daneben.
+ */
+function ScaleInput({ value, onChange }: { value: CheckValue; onChange: (v: CheckValue) => void }) {
+  const box = useRef<HTMLDivElement>(null)
+  /** Beim Aufsetzen dieselbe Zahl wie bisher? Dann loescht ein Tipp sie —
+      aber nur, solange der Finger nicht weitergewandert ist. */
+  const loeschen = useRef(false)
+
+  function unterm(x: number, y: number): number | null {
+    const el = box.current
+    if (!el) return null
+    const tasten = [...el.querySelectorAll('button')]
+    if (!tasten.length) return null
+    // Zuerst die Reihe, in der der Finger liegt.
+    const reihe = tasten.filter((t) => {
+      const r = t.getBoundingClientRect()
+      return y >= r.top && y <= r.bottom
+    })
+    const feld = reihe.length ? reihe : tasten
+    let beste = feld[0]
+    let nah = Infinity
+    for (const t of feld) {
+      const r = t.getBoundingClientRect()
+      const d = Math.abs(x - (r.left + r.width / 2))
+      if (d < nah) { nah = d; beste = t }
+    }
+    const n = Number(beste.textContent)
+    return Number.isFinite(n) ? n : null
+  }
+
+  function down(e: React.PointerEvent) {
+    const n = unterm(e.clientX, e.clientY)
+    if (n === null) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    loeschen.current = value === n
+    if (value !== n) onChange(n)
+  }
+
+  function move(e: React.PointerEvent) {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const n = unterm(e.clientX, e.clientY)
+    if (n === null || n === value) return
+    loeschen.current = false
+    onChange(n)
+  }
+
+  function up(e: React.PointerEvent) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    if (loeschen.current) onChange(null)
+    loeschen.current = false
+  }
+
+  return (
+    <div
+      ref={box}
+      className="scale"
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+    >
+      {Array.from({ length: SCALE_MAX }, (_, i) => i + 1).map((n) => (
+        // Die Tasten selbst hoeren nicht mehr zu — der Behaelter macht das,
+        // sonst haette jede ihren eigenen Klick und das Ziehen faende nie statt.
+        <button key={n} type="button" tabIndex={-1} aria-pressed={value === n} title={scaleLabel(n)}>{n}</button>
+      ))}
+    </div>
+  )
+}
+
 /** Gelesene Rubrik: zeigt nur an, was die Quelle liefert. */
 function ExternalValue({ def, value, state, day }: {
   def: CheckDef
   value: CheckValue
-  state?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  state?: 'idle' | 'laden' | 'fehler' | 'ohne' | 'verworfen'
   /** Die uebrigen Werte des Tages — fuer die Makros unter den Kalorien. */
   day?: Record<string, CheckValue>
 }) {
@@ -836,7 +990,8 @@ function ExternalValue({ def, value, state, day }: {
   if (n === null) {
     return (
       <div className="ext ext--empty">
-        {state === 'laden' ? 'wird geholt …'
+        {state === 'verworfen' ? 'für diesen Tag verworfen'
+          : state === 'laden' ? 'wird geholt …'
           : state === 'ohne' ? 'kein Kalorienbrudi-Konto gewählt — im Konto einstellen'
           : state === 'fehler' ? 'Quelle nicht erreichbar'
           : 'für diesen Tag nichts erfasst'}
