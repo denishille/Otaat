@@ -228,6 +228,25 @@ h2.section-title {
 .arrowbtn:hover:not([disabled]) { color: var(--ink); border-color: var(--ink-3); }
 .arrowbtn[disabled] { opacity: .3; pointer-events: none; }
 
+/* Die Zeile ueber dem Raster. Haelt nur den Sortier-Knopf, rechtsbuendig,
+   damit sie nichts vom Tag wegnimmt. */
+.grid-head { display: flex; justify-content: flex-end; margin-bottom: -4px; }
+
+/* Die Auswahl im Sortier-Blatt: eine Liste, keine Knopfreihe — jede Zeile
+   traegt ihre Erklaerung. */
+.sortlist {
+  display: flex; flex-direction: column; gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.sortlist button {
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  padding: 13px 15px; background: var(--surface); text-align: left;
+  transition: background .13s;
+}
+.sortlist button:hover { background: var(--paper-sunk); }
+.sortlist b { font-size: 14.5px; font-weight: 600; }
+.sortlist span { font-size: 12.5px; color: var(--ink-3); }
+
 .check-grid {
   display: grid; gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));

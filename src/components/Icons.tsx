@@ -85,3 +85,10 @@ export const Mark = ({ className }: P) => {
     </svg>
   )
 }
+
+/* Drei Striche, von lang nach kurz: sortieren. */
+export const Sort = (p: P) => (
+  <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}>
+    <path d="M2.5 4h11M2.5 8h7M2.5 12h3.5" />
+  </svg>
+)

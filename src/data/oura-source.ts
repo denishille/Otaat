@@ -25,7 +25,7 @@ export interface OuraField {
 export const OURA_CHECKS: OuraField[] = [
   { key: 'sleep',             name: 'Schlaf',      unit: 'h' },
   { key: 'oura_sleep_score',  name: 'Schlaf-Score' },
-  { key: 'oura_readiness',    name: 'Readiness' },
+  { key: 'oura_readiness',    name: 'Tagesform' },
   { key: 'oura_steps',        name: 'Schritte' },
 ]
 

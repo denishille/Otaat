@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 14
+const STATE_VERSION = 15
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -279,6 +279,13 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) < 14) {
     const weg = new Set(['brudi_protein', 'brudi_carbs', 'brudi_fat'])
     for (let i = next.length - 1; i >= 0; i--) if (weg.has(next[i].id)) next.splice(i, 1)
+  }
+
+  // Aus "Readiness" wird "Tagesform". Wie schon bei Laune/Happiness nur dann,
+  // wenn der alte Name noch unveraendert dasteht.
+  if ((s.meta.v ?? 1) < 15) {
+    const r = next.find((c) => c.id === 'oura_readiness')
+    if (r && r.name === 'Readiness') r.name = 'Tagesform'
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

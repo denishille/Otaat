@@ -76,7 +76,7 @@ export const CHECK_CATALOG: CheckGroup[] = [
         note: 'vom Oura-Ring',
       },
       {
-        def: { id: 'oura_readiness', name: 'Readiness', kind: 'external', source: 'oura', target: 80 },
+        def: { id: 'oura_readiness', name: 'Tagesform', kind: 'external', source: 'oura', target: 80 },
         note: 'vom Oura-Ring',
       },
       {

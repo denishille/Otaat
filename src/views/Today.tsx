@@ -9,7 +9,7 @@ import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { applyOuraDays, fetchOura } from '../lib/oura'
 import { BRUDI_HIDDEN_KEYS, BRUDI_MACROS } from '../data/brudi-source'
-import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
+import { Check, ChevL, ChevR, Grip, Pencil, Plus, Sort, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { useSwipe } from '../lib/swipe'
@@ -34,6 +34,7 @@ export function Today() {
   const [stats, setStats] = useState<CheckDef | null>(null)
   const [adding, setAdding] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [sorting, setSorting] = useState(false)
 
   const defs = activeChecks(state)
   const entry = state.days[date]
@@ -267,6 +268,9 @@ export function Today() {
   /* ---- Reihenfolge per Griff ---- */
 
   const cardRefs = useRef(new Map<string, HTMLDivElement | null>())
+  /** Wo der Finger gerade ist. Als Ref, damit die Rollschleife ihn sieht,
+      ohne bei jedem Bild neu aufgesetzt zu werden. */
+  const zeigerY = useRef<number | null>(null)
   const [reorder, setReorder] = useState<{ id: string; x: number; y: number; order: string[] } | null>(null)
 
   const shownDefs = reorder
@@ -276,6 +280,7 @@ export function Today() {
   function startReorder(e: React.PointerEvent, id: string) {
     e.preventDefault()
     e.stopPropagation()
+    zeigerY.current = e.clientY
     setReorder({ id, x: e.clientX, y: e.clientY, order: defs.map((d) => d.id) })
   }
 
@@ -283,6 +288,7 @@ export function Today() {
     if (!reorder) return
 
     const onMove = (e: PointerEvent) => {
+      zeigerY.current = e.clientY
       setReorder((cur) => {
         if (!cur) return cur
         const from = cur.order.indexOf(cur.id)
@@ -320,10 +326,41 @@ export function Today() {
       })
     }
 
+    /*
+     * Mitscrollen, solange gezogen wird.
+     *
+     * Der Griff hat `touch-action: none`, sonst wuerde jeder Zug die Seite
+     * scrollen statt die Karte zu bewegen. Damit ist aber auch das normale
+     * Scrollen weg, und eine Karte liess sich nur innerhalb des Bildschirms
+     * verschieben — bei zwanzig Rubriken kommt man so nie von unten nach oben.
+     *
+     * Also: kommt der Finger einem Rand nahe, rollt die Seite selbst, und
+     * zwar schneller, je naeher er dran ist. Der Zug laeuft dabei weiter, die
+     * Karte bleibt am Finger.
+     */
+    const RAND = 90          // ab hier faengt es an
+    const TEMPO = 14         // Pixel je Bild bei voller Naehe
+    let schieber = 0
+
+    const rollen = () => {
+      const y = zeigerY.current
+      if (y === null) { schieber = 0; return }
+      const oben = y - RAND
+      const unten = window.innerHeight - RAND - y
+      let d = 0
+      if (oben < 0) d = (oben / RAND) * TEMPO
+      else if (unten < 0) d = (-unten / RAND) * TEMPO
+      if (d !== 0) window.scrollBy(0, d)
+      schieber = requestAnimationFrame(rollen)
+    }
+    schieber = requestAnimationFrame(rollen)
+
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
     return () => {
+      cancelAnimationFrame(schieber)
+      zeigerY.current = null
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
@@ -392,6 +429,13 @@ export function Today() {
 
       <Insights state={state} />
 
+      {shownDefs.length > 1 && (
+        <div className="grid-head">
+          <button className="btn btn--quiet btn--sm" onClick={() => setSorting(true)}>
+            <Sort /> Sortieren
+          </button>
+        </div>
+      )}
 
       <div className="check-grid">
         {shownDefs.map((def) => (
@@ -441,6 +485,14 @@ export function Today() {
         />
       )}
 
+      {sorting && (
+        <SortSheet
+          defs={defs}
+          values={entry?.values ?? {}}
+          onClose={() => setSorting(false)}
+        />
+      )}
+
       {reorder && (
         <div
           className="drag-ghost"
@@ -467,6 +519,71 @@ export function Today() {
         />
       )}
     </>
+  )
+}
+
+/**
+ * Sortieren.
+ *
+ * Der Griff an der Karte bleibt der Weg fuer die eine Rubrik, die zwei Plaetze
+ * weiter soll. Fuer "alles alphabetisch" war er nie gedacht — bei zwanzig
+ * Rubriken ist das zwanzigmal ziehen.
+ *
+ * Jede Wahl schreibt die Reihenfolge fest, wie der Griff auch. Es gibt kein
+ * "sortiert angezeigt" neben einer anderen echten Reihenfolge: zwei
+ * Reihenfolgen nebeneinander sind eine mehr, als man im Kopf behalten will.
+ */
+function SortSheet({ defs, values, onClose }: {
+  defs: CheckDef[]
+  values: Record<string, CheckValue>
+  onClose: () => void
+}) {
+  const ARTEN: CheckKind[] = ['external', 'number', 'scale', 'bool', 'multi', 'choice', 'text']
+
+  function anwenden(name: string, cmp: (a: CheckDef, b: CheckDef) => number) {
+    const reihe = [...defs].sort(cmp).map((d) => d.id)
+    update((d) => {
+      reihe.forEach((id, i) => {
+        const c = d.checks.find((x) => x.id === id)
+        if (c) c.sort = (i + 1) * 10
+      })
+    })
+    toast(name)
+    onClose()
+  }
+
+  const nachName = (a: CheckDef, b: CheckDef) => a.name.localeCompare(b.name, 'de')
+
+  return (
+    <Sheet
+      title="Sortieren"
+      onClose={onClose}
+      footer={<button className="btn btn--quiet" onClick={onClose}>Abbrechen</button>}
+    >
+      <div className="sortlist">
+        <button onClick={() => anwenden('Nach Name sortiert', nachName)}>
+          <b>Nach Name</b><span>A bis Z</span>
+        </button>
+
+        <button onClick={() => anwenden('Nach Art sortiert', (a, b) => {
+          const d = ARTEN.indexOf(a.kind) - ARTEN.indexOf(b.kind)
+          return d !== 0 ? d : nachName(a, b)
+        })}>
+          <b>Nach Art</b><span>Gemessenes, Zahlen, Skalen, Ja/Nein, Auswahl, Notizen</span>
+        </button>
+
+        <button onClick={() => anwenden('Offene zuerst', (a, b) => {
+          const d = Number(isFilled(values[a.id])) - Number(isFilled(values[b.id]))
+          return d !== 0 ? d : a.sort - b.sort
+        })}>
+          <b>Offene zuerst</b><span>was für diesen Tag noch fehlt, nach oben</span>
+        </button>
+
+        <button onClick={() => anwenden('Umgedreht', (a, b) => b.sort - a.sort)}>
+          <b>Umdrehen</b><span>die jetzige Reihenfolge von hinten</span>
+        </button>
+      </div>
+    </Sheet>
   )
 }
 
@@ -666,7 +783,9 @@ function ExternalValue({ def, value, state, day }: {
           ))}
         </div>
       )}
-      <div className="ext-note">aus Kalorienbrudi</div>
+      {/* Bis hierher stand auf jeder gelesenen Karte "aus Kalorienbrudi" —
+          auch auf denen vom Ring. */}
+      <div className="ext-note">{def.source === 'oura' ? 'vom Oura-Ring' : 'aus Kalorienbrudi'}</div>
     </div>
   )
 }
