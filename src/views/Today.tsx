@@ -456,9 +456,14 @@ export function Today() {
 
       <Insights state={state} />
 
+      {/* Kopfzeile der Liste. Der Knopf stand vorher allein rechts in der
+          Luft — ohne etwas daneben sah er aus, als waere er uebrig geblieben.
+          Mit der Zahl links und einer Haarlinie darunter gehoert die Zeile
+          sichtbar zu dem, was darunter kommt. */}
       {shownDefs.length > 1 && (
         <div className="grid-head">
-          <button className="btn btn--ghost btn--sm" onClick={() => setSorting(true)}>
+          <span className="grid-head-k">{shownDefs.length} Rubriken</span>
+          <button className="btn btn--quiet btn--sm" onClick={() => setSorting(true)}>
             <Sort /> Ordnen
           </button>
         </div>
