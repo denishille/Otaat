@@ -1,6 +1,6 @@
 import type { AppState, CheckDef, CheckValue } from './types'
 import { addDays, checkerToday } from './dates'
-import { BRUDI_HIDDEN } from '../data/brudi-source'
+import { HIDDEN_MEASURES } from '../data/measured'
 import { activeChecks, countedValues, scoreDay, timeKey } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
@@ -327,8 +327,8 @@ function features(s: AppState, dates: string[]): Feature[] {
 
   // Die gemessenen Werte ohne Karte. Jeder bekommt einen eigenen Traeger,
   // damit die Paar-Regel weiter ueber `check.id` laeuft.
-  for (const f of BRUDI_HIDDEN) {
-    const def: CheckDef = { id: f.key, name: f.name, kind: 'external', source: 'brudi', unit: f.unit, sort: 0 }
+  for (const f of HIDDEN_MEASURES) {
+    const def: CheckDef = { id: f.key, name: f.name, kind: 'external', unit: f.unit, sort: 0 }
     out.push({
       id: f.key,
       check: def,

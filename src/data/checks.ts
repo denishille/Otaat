@@ -31,8 +31,11 @@ export const CHECK_CATALOG: CheckGroup[] = [
     title: 'Der Tag',
     items: [
       {
+        // Bleibt eine Zahl zum Eintragen, auch wenn der Ring verbunden ist:
+        // an einer Nacht ohne Ring soll man sie trotzdem nachtragen koennen.
+        // Oura fuellt nur, was leer ist — siehe `Today.tsx`.
         def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8, withTime: true },
-        note: 'dazu die Uhrzeit, zu der du ins Bett bist',
+        note: 'mit Uhrzeit, wann du ins Bett bist — der Oura-Ring füllt beides selbst',
       },
       { def: { id: 'work', name: 'Arbeit', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
     ],
@@ -75,6 +78,26 @@ export const CHECK_CATALOG: CheckGroup[] = [
       {
         def: { id: 'brudi_fat', name: 'Fett', kind: 'external', source: 'brudi', unit: 'g' },
         note: 'Makro aus dem Kalorienbrudi-Bestand',
+      },
+    ],
+  },
+  {
+    // Kommt nur an, wenn der Ring im Konto verbunden ist. Ohne Verbindung
+    // stehen die Karten da und sagen, dass fuer den Tag nichts erfasst ist —
+    // deshalb steht es auf jeder Karte im Regal dabei.
+    title: 'Ring',
+    items: [
+      {
+        def: { id: 'oura_sleep_score', name: 'Schlaf-Score', kind: 'external', source: 'oura', target: 80 },
+        note: 'vom Oura-Ring',
+      },
+      {
+        def: { id: 'oura_readiness', name: 'Readiness', kind: 'external', source: 'oura', target: 80 },
+        note: 'vom Oura-Ring',
+      },
+      {
+        def: { id: 'oura_steps', name: 'Schritte', kind: 'external', source: 'oura', target: 8000 },
+        note: 'vom Oura-Ring',
       },
     ],
   },

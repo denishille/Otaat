@@ -19,7 +19,7 @@ export interface CheckDef {
   /** Startwert fuer einen frischen Tag, wenn es noch keinen Vortag gibt */
   fallback?: CheckValue
   /** Woher die Werte kommen, wenn kind === 'external'. Nicht editierbar. */
-  source?: 'brudi'
+  source?: 'brudi' | 'oura'
   /** Schrittweite fuer kind === 'number' */
   step?: number
   /** Ab diesem Wert zaehlt der Tag als "erfuellt" (number/scale). Bei bool: true. */

@@ -7,8 +7,9 @@ import { Board } from './views/Board'
 import { Sheet } from './components/Sheet'
 import { Toasts, toast } from './components/Toasts'
 import { Mark, Moon, Sun } from './components/Icons'
-import { daysBetween, today } from './lib/dates'
+import { daysBetween, shortDate, today } from './lib/dates'
 import { confirmedDays } from './lib/scoring'
+import { ouraConnected, ouraConnectUrl, ouraDisconnect } from './lib/oura'
 
 type Tab = 'today' | 'future' | 'board'
 
@@ -202,6 +203,10 @@ function Account({ onClose }: { onClose: () => void }) {
               <span className="acc-k">Passwort</span>
               <PasswordField />
             </div>
+            <div className="acc-row">
+              <span className="acc-k">Oura</span>
+              <OuraField />
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -281,6 +286,61 @@ function NameField({ current }: { current: string | null }) {
         onBlur={() => void save()}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
+    </span>
+  )
+}
+
+/**
+ * Den Ring verbinden oder loesen.
+ *
+ * Der Knopf oeffnet Oura in einem neuen Tab. Zurueck kommt der Nutzer nicht
+ * hierher, sondern auf eine Seite der Edge Function — das Token darf den
+ * Browser nie sehen, also kann der Rueckweg auch nicht durch die App laufen.
+ * Beim naechsten Blick ins Konto steht hier das Datum.
+ */
+function OuraField() {
+  const [seit, setSeit] = useState<string | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const [fehler, setFehler] = useState<string | null>(null)
+
+  useEffect(() => { void ouraConnected().then(setSeit) }, [])
+
+  async function verbinden() {
+    setLaeuft(true)
+    setFehler(null)
+    const { url, error } = await ouraConnectUrl()
+    setLaeuft(false)
+    if (error || !url) { setFehler(error ?? 'Keine Adresse bekommen.'); return }
+    // `noopener` gehoert dazu: die fremde Seite hat auf `window.opener`
+    // nichts zu suchen.
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  async function loesen() {
+    setLaeuft(true)
+    const err = await ouraDisconnect()
+    setLaeuft(false)
+    if (err) { setFehler(err); return }
+    setSeit(null)
+    toast('Oura gelöst')
+  }
+
+  if (seit) {
+    return (
+      <span className="acc-v" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 13 }}>verbunden seit {shortDate(seit.slice(0, 10))}</span>
+        <button className="btn btn--quiet btn--sm" disabled={laeuft} onClick={() => void loesen()}>Lösen</button>
+        {fehler && <span style={{ fontSize: 12, color: 'var(--signal)' }}>{fehler}</span>}
+      </span>
+    )
+  }
+
+  return (
+    <span className="acc-v" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <button className="btn btn--ghost btn--sm" disabled={laeuft} onClick={() => void verbinden()}>
+        {laeuft ? 'Moment …' : 'Verbinden'}
+      </button>
+      {fehler && <span style={{ fontSize: 12, color: 'var(--signal)' }}>{fehler}</span>}
     </span>
   )
 }

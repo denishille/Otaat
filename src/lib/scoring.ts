@@ -1,6 +1,6 @@
 import type { AppState, CheckDef, CheckValue, DayEntry } from './types'
 import { addDays, checkerToday } from './dates'
-import { BRUDI_HIDDEN_KEYS } from '../data/brudi-source'
+import { HIDDEN_KEYS } from '../data/measured'
 
 /** Wo die Uhrzeit eines Checks im Tag liegt. Neben dem Wert, nicht darin. */
 export const timeKey = (id: string): string => `${id}@time`
@@ -97,10 +97,11 @@ export function countedValues(s: AppState, date: string): Record<string, CheckVa
   for (const def of s.checks) {
     if (def.kind === 'external' && isFilled(day.values[def.id])) out[def.id] = day.values[def.id]
   }
-  // Die Mikronaehrwerte haben keine Rubrik, sind aber aus demselben Holz:
-  // gemessen, nicht geschaetzt. Ohne sie hier saehe die Zusammenhangs-Suche
-  // an unbestaetigten Tagen die Kalorien, aber nicht das Magnesium daneben.
-  for (const key of BRUDI_HIDDEN_KEYS) {
+  // Die Mikronaehrwerte und die Ringwerte haben keine Rubrik, sind aber aus
+  // demselben Holz: gemessen, nicht geschaetzt. Ohne sie hier saehe die
+  // Zusammenhangs-Suche an unbestaetigten Tagen die Kalorien, aber nicht das
+  // Magnesium daneben, und den Schlaf-Score, aber nicht die HRV.
+  for (const key of HIDDEN_KEYS) {
     if (isFilled(day.values[key])) out[key] = day.values[key]
   }
   return out

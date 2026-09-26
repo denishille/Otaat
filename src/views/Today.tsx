@@ -7,6 +7,7 @@ import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
+import { applyOuraDays, fetchOura } from '../lib/oura'
 import { BRUDI_HIDDEN_KEYS } from '../data/brudi-source'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
@@ -27,7 +28,7 @@ import { toast } from '../components/Toasts'
 const blankDay = (date: string): DayEntry => ({ date, values: {}, confirmed: false })
 
 export function Today() {
-  const { state } = useStore()
+  const { state, userId } = useStore()
   const [date, setDate] = useState(checkerToday())
   const [editing, setEditing] = useState<CheckDef | null>(null)
   const [stats, setStats] = useState<CheckDef | null>(null)
@@ -83,6 +84,29 @@ export function Today() {
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brudiIds])
+
+  /**
+   * Dasselbe vom Ring. Getrennt von der Essens-Quelle, weil es ueber eine
+   * Edge Function laeuft: Oura gibt Browser-Aufrufen keine CORS-Freigabe,
+   * und das Zugangstoken haette im Bundle ohnehin nichts verloren.
+   *
+   * Eine Sonderregel fuer `sleep`: der Ring fuellt die Rubrik **nur, wo sie
+   * leer ist**. Die Rubrik gab es lange vor dem Ring und sie ist von Hand
+   * gefuehrt worden; rueckwirkend hundert abgeschlossene Tage zu ueberschreiben
+   * waere keine Verbesserung, sondern Geschichtsklitterung. Ab heute ist das
+   * Feld frueh am Morgen leer und der Ring traegt es ein — genau das war der
+   * Wunsch. Dasselbe gilt fuer die Bettzeit.
+   */
+  useEffect(() => {
+    if (!userId || !defs.some((d) => d.source === 'oura' || d.id === 'sleep')) return
+    let ab = false
+    void fetchOura(addDays(checkerToday(), -180), checkerToday()).then((res) => {
+      if (ab || !res.days.length) return
+      update((d) => applyOuraDays(d, res.days, blankDay))
+    })
+    return () => { ab = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   /**
    * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,

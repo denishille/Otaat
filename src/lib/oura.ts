@@ -1,0 +1,104 @@
+import { supabase } from './supabase'
+import type { AppState, DayEntry } from './types'
+import { isFilled, timeKey } from './scoring'
+
+/* Schlaf- und Gesundheitswerte vom Ring.
+   -----------------------------------------------------------------------
+   Die App spricht nie direkt mit Oura: das Zugangstoken liegt in einer
+   Edge Function, und Oura gibt Browser-Aufrufen ohnehin keine CORS-Freigabe. */
+
+export interface OuraDay {
+  date: string
+  /** Schluessel -> Wert. Die Bettzeit kommt als "HH:MM". */
+  values: Record<string, number | string>
+}
+
+export interface OuraAnswer {
+  connected: boolean
+  days: OuraDay[]
+  error?: string
+}
+
+const leer: OuraAnswer = { connected: false, days: [] }
+
+/**
+ * Holt die Tage ab `from`. Wirft nicht — ohne Netz oder bei einem Fehler
+ * bleibt stehen, was schon lokal liegt.
+ */
+export async function fetchOura(from: string, to: string): Promise<OuraAnswer> {
+  if (!supabase) return leer
+  try {
+    const { data, error } = await supabase.functions.invoke('oura-days', { body: { from, to } })
+    if (error) return { ...leer, error: error.message }
+    return (data as OuraAnswer) ?? leer
+  } catch (e) {
+    return { ...leer, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
+ * Startet die Verbindung. Gibt die Adresse zurueck, auf die der Nutzer
+ * geschickt werden muss — der Aufruf selbst oeffnet nichts, damit die
+ * aufrufende Stelle entscheiden kann, ob das ein neues Fenster wird.
+ */
+export async function ouraConnectUrl(): Promise<{ url?: string; error?: string }> {
+  if (!supabase) return { error: 'Ohne Konto geht das nicht.' }
+  try {
+    const { data, error } = await supabase.functions.invoke('oura-connect', { body: {} })
+    if (error) return { error: error.message }
+    const url = (data as { url?: string; error?: string })?.url
+    return url ? { url } : { error: (data as { error?: string })?.error ?? 'Unbekannter Fehler.' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Steht eine Verbindung? Liest die View, nie die Token-Tabelle. */
+export async function ouraConnected(): Promise<string | null> {
+  if (!supabase) return null
+  const { data } = await supabase.from('otaat_oura_status').select('connected_at').maybeSingle()
+  return (data?.connected_at as string | undefined) ?? null
+}
+
+/** Verbindung loesen. Die Token-Zeile ist nur fuer die Function erreichbar,
+    also macht das auch die Function — ueber denselben Weg wie der Abruf. */
+export async function ouraDisconnect(): Promise<string | null> {
+  if (!supabase) return 'Ohne Konto geht das nicht.'
+  const { error } = await supabase.functions.invoke('oura-days', { body: { disconnect: true } })
+  return error ? error.message : null
+}
+
+/**
+ * Die Ringwerte in den Bestand schreiben.
+ *
+ * Steht hier und nicht im Effekt, weil die eine interessante Regel darin
+ * steckt und eine Regel, die man nicht pruefen kann, keine ist.
+ *
+ * **`sleep` und die Bettzeit werden nur gefuellt, wo nichts steht.** Die
+ * Rubrik gab es lange vor dem Ring und sie ist von Hand gefuehrt worden;
+ * hundert abgeschlossene Tage rueckwirkend zu ueberschreiben waere keine
+ * Verbesserung, sondern Geschichtsklitterung — und die Zahlen, gegen die der
+ * Zusammenhang-Finder bisher gerechnet hat, waeren plötzlich andere. Ab jetzt
+ * ist das Feld frueh am Morgen leer, und dann traegt der Ring es ein.
+ *
+ * Alles, was nur der Ring kennt, wird immer geschrieben: da gibt es keinen
+ * Handeintrag, den man ueberfahren koennte.
+ */
+export function applyOuraDays(
+  draft: AppState,
+  days: OuraDay[],
+  leererTag: (date: string) => DayEntry,
+): number {
+  const eigen = new Set(['sleep', timeKey('sleep')])
+  let geschrieben = 0
+  for (const row of days) {
+    const day = (draft.days[row.date] ??= leererTag(row.date))
+    for (const [key, v] of Object.entries(row.values)) {
+      if (eigen.has(key) && isFilled(day.values[key])) continue
+      if (day.values[key] === v) continue
+      day.values[key] = v
+      geschrieben++
+    }
+  }
+  return geschrieben
+}
