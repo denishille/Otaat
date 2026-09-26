@@ -240,7 +240,10 @@ h2.section-title {
   display: flex; flex-direction: column; gap: 1px; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
   margin: 0; padding: 0; list-style: none;
+  /* Am Griff gehoert der Zug uns; ausserhalb soll das Blatt weiter scrollen. */
+  touch-action: pan-y;
 }
+.sortlist .sortrow-grip { touch-action: none; }
 .sortrow {
   display: flex; align-items: center; gap: 10px;
   padding: 7px 10px 7px 14px; background: var(--surface);
@@ -256,11 +259,13 @@ h2.section-title {
   font-family: var(--mono); font-size: 10px; color: var(--ink-4);
   text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
 }
-.sortrow .iconbtn { flex-shrink: 0; }
-.sortrow .iconbtn[disabled] { opacity: .3; }
-/* Kurz anleuchten, wo die Zeile gelandet ist — sonst verliert man bei
-   zwanzig Zeilen die Spur, welche man gerade geschoben hat. */
-.sortrow--moved { background: var(--cobalt-wash); transition: none; }
+/* Der Griff braucht Platz zum Treffen, nicht nur zum Sehen. */
+.sortrow-grip { flex-shrink: 0; width: 38px; height: 38px; }
+/* Die gefasste Zeile hebt sich ab, damit man sie beim Ziehen nicht verliert. */
+.sortrow--dragging {
+  background: var(--cobalt-wash); transition: none;
+  box-shadow: var(--shadow-2); position: relative; z-index: 1;
+}
 
 @media (max-width: 520px) {
   .sortrow-art { display: none; }

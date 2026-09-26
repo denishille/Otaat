@@ -9,7 +9,7 @@ import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { applyOuraDays, fetchOura } from '../lib/oura'
 import { BRUDI_HIDDEN_KEYS, BRUDI_MACROS } from '../data/brudi-source'
-import { Check, ChevL, ChevR, Down, Grip, Pencil, Plus, Sort, Trash, Up, X } from '../components/Icons'
+import { Check, ChevL, ChevR, Grip, Pencil, Plus, Sort, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { useSwipe } from '../lib/swipe'
@@ -571,23 +571,91 @@ function SortSheet({ defs, values, onClose }: {
   const ARTEN: CheckKind[] = ['external', 'number', 'scale', 'bool', 'multi', 'choice', 'text']
 
   /* Die Reihenfolge wird hier bearbeitet und erst beim Schliessen
-     festgeschrieben. Sonst schreibt jeder Pfeiltipp in den Bestand und
-     schiebt einen Abgleich an. */
+     festgeschrieben. Sonst schreibt jeder Zug in den Bestand und schiebt
+     einen Abgleich an. */
   const [reihe, setReihe] = useState<CheckDef[]>(defs)
-  const [gefasst, setGefasst] = useState<string | null>(null)
+  const [zieht, setZieht] = useState<string | null>(null)
 
-  function schieben(i: number, dir: number) {
-    const j = i + dir
-    if (j < 0 || j >= reihe.length) return
-    const next = [...reihe]
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setReihe(next)
-    setGefasst(next[j].id)
+  const liste = useRef<HTMLOListElement>(null)
+  const zeilen = useRef(new Map<string, HTMLLIElement | null>())
+  const zeigerY = useRef<number | null>(null)
+
+  /**
+   * Ziehen in der Liste.
+   *
+   * Die Zeile unter dem Finger bestimmt den Platz — dasselbe Verfahren wie
+   * bei den Karten im Checker, nur senkrecht. Der Unterschied: hier scrollt
+   * nicht die Seite, sondern das Blatt, also rollt auch das Blatt mit.
+   */
+  function fasse(e: React.PointerEvent, id: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    // Die **Liste** faengt den Zeiger, nicht der Griff.
+    //
+    // Sobald sich die Reihenfolge das erste Mal aendert, setzt React die
+    // Zeile im DOM um — und ein Element, das aus dem Dokument genommen wird,
+    // verliert seine Zeiger-Erfassung. Danach gingen die Ereignisse an den
+    // Griff darunter, dessen Kennung eine andere ist, und das Ziehen blieb
+    // nach genau einem Platz stehen. Die Liste bleibt, wo sie ist.
+    liste.current?.setPointerCapture(e.pointerId)
+    zeigerY.current = e.clientY
+    setZieht(id)
   }
+
+  function fuehre(e: React.PointerEvent) {
+    const id = zieht
+    if (!id) return
+    zeigerY.current = e.clientY
+    setReihe((cur) => {
+      const von = cur.findIndex((d) => d.id === id)
+      if (von < 0) return cur
+      let nach = von
+      for (let i = 0; i < cur.length; i++) {
+        if (i === von) continue
+        const el = zeilen.current.get(cur[i].id)
+        if (!el) continue
+        const r = el.getBoundingClientRect()
+        if (e.clientY >= r.top && e.clientY <= r.bottom) { nach = i; break }
+      }
+      if (nach === von) return cur
+      const next = [...cur]
+      next.splice(nach, 0, ...next.splice(von, 1))
+      return next
+    })
+  }
+
+  function lass(e: React.PointerEvent) {
+    if (liste.current?.hasPointerCapture(e.pointerId)) liste.current.releasePointerCapture(e.pointerId)
+    zeigerY.current = null
+    setZieht(null)
+  }
+
+  // Mitrollen, solange gezogen wird — sonst kommt man in einem Blatt mit
+  // zwanzig Zeilen nicht von unten nach oben.
+  useEffect(() => {
+    if (!zieht) return
+    const topf = liste.current?.closest('.sheet-body') as HTMLElement | null
+    if (!topf) return
+    const RAND = 64
+    const TEMPO = 10
+    let schieber = 0
+    const rollen = () => {
+      const y = zeigerY.current
+      if (y !== null) {
+        const r = topf.getBoundingClientRect()
+        const oben = y - (r.top + RAND)
+        const unten = (r.bottom - RAND) - y
+        if (oben < 0) topf.scrollBy(0, (oben / RAND) * TEMPO)
+        else if (unten < 0) topf.scrollBy(0, (-unten / RAND) * TEMPO)
+      }
+      schieber = requestAnimationFrame(rollen)
+    }
+    schieber = requestAnimationFrame(rollen)
+    return () => cancelAnimationFrame(schieber)
+  }, [zieht])
 
   function sortieren(cmp: (a: CheckDef, b: CheckDef) => number) {
     setReihe([...reihe].sort(cmp))
-    setGefasst(null)
   }
 
   function fertig() {
@@ -623,20 +691,29 @@ function SortSheet({ defs, values, onClose }: {
         <button className="btn btn--quiet btn--sm" onClick={() => setReihe([...reihe].reverse())}>Umdrehen</button>
       </div>
 
-      {/* Und die Liste zum Verschieben. Pfeile statt Ziehen: in einem Blatt,
-          das selbst scrollt, ist ein Zug ueber zwanzig Zeilen eine Zumutung —
-          und auf dem Handy trifft man den Griff ohnehin schlechter als eine
-          Taste. */}
-      <ol className="sortlist">
+      {/* Die Liste zum Ziehen. Angefasst wird am Griff, nicht an der Zeile —
+          sonst faengt jeder Tipp auf einen Namen einen Zug an. */}
+      <ol
+        className="sortlist"
+        ref={liste}
+        onPointerMove={fuehre}
+        onPointerUp={lass}
+        onPointerCancel={lass}
+      >
         {reihe.map((d, i) => (
-          <li key={d.id} className={'sortrow' + (gefasst === d.id ? ' sortrow--moved' : '')}>
+          <li
+            key={d.id}
+            ref={(el) => { zeilen.current.set(d.id, el) }}
+            className={'sortrow' + (zieht === d.id ? ' sortrow--dragging' : '')}
+          >
             <span className="sortrow-n">{i + 1}</span>
             <span className="sortrow-name">{d.name}</span>
             <span className="sortrow-art">{kindLabel(d)}</span>
-            <button className="iconbtn" disabled={i === 0} aria-label="nach oben"
-              onClick={() => schieben(i, -1)}><Up /></button>
-            <button className="iconbtn" disabled={i === reihe.length - 1} aria-label="nach unten"
-              onClick={() => schieben(i, 1)}><Down /></button>
+            <button
+              className="grip sortrow-grip"
+              aria-label={`${d.name} verschieben`}
+              onPointerDown={(e) => fasse(e, d.id)}
+            ><Grip /></button>
           </li>
         ))}
       </ol>
