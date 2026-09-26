@@ -8,7 +8,7 @@ import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { applyOuraDays, fetchOura } from '../lib/oura'
-import { BRUDI_HIDDEN_KEYS } from '../data/brudi-source'
+import { BRUDI_HIDDEN_KEYS, BRUDI_MACROS } from '../data/brudi-source'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
@@ -410,6 +410,7 @@ export function Today() {
             onAddOption={(o) => addOption(def, o)}
             onRemoveOption={(o) => removeOption(def, o)}
             externalState={def.kind === 'external' ? brudiState : undefined}
+            dayValues={entry?.values}
           />
         ))}
 
@@ -484,9 +485,11 @@ interface CardProps {
   onRemoveOption: (option: string) => void
   /** nur bei gelesenen Rubriken gesetzt */
   externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  /** Alle Werte des Tages — die Kalorien-Kachel zeigt die Makros mit an. */
+  dayValues?: Record<string, CheckValue>
 }
 
-function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, onOpen, onAddOption, onRemoveOption, externalState }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues }: CardProps) {
   const filled = isFilled(value)
 
   /**
@@ -513,7 +516,7 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} />
+      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} dayValues={dayValues} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -530,7 +533,7 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
   )
 }
 
-function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption, externalState }: {
+function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption, externalState, dayValues }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
@@ -539,10 +542,11 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
   externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  dayValues?: Record<string, CheckValue>
 }) {
   switch (def.kind) {
     case 'external':
-      return <ExternalValue def={def} value={value} state={externalState} />
+      return <ExternalValue def={def} value={value} state={externalState} day={dayValues} />
     case 'bool':
       return (
         <div className="bool">
@@ -604,12 +608,23 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
 }
 
 /** Gelesene Rubrik: zeigt nur an, was die Quelle liefert. */
-function ExternalValue({ def, value, state }: {
+function ExternalValue({ def, value, state, day }: {
   def: CheckDef
   value: CheckValue
   state?: 'idle' | 'laden' | 'fehler' | 'ohne'
+  /** Die uebrigen Werte des Tages — fuer die Makros unter den Kalorien. */
+  day?: Record<string, CheckValue>
 }) {
   const n = typeof value === 'number' ? value : null
+
+  /* Die Makros gehoeren zur Mahlzeit, nicht neben sie. Eine Zeile unter der
+     Zahl, klein, in der Reihenfolge Eiweiss / Kohlenhydrate / Fett. Fehlt
+     einer, faellt er weg statt als Null dazustehen. */
+  const makros = def.id === 'brudi_kcal' && day
+    ? BRUDI_MACROS
+        .map((m) => ({ name: m.name, v: day[m.key] }))
+        .filter((m): m is { name: string; v: number } => typeof m.v === 'number')
+    : []
 
   if (n === null) {
     return (
@@ -628,6 +643,15 @@ function ExternalValue({ def, value, state }: {
         <span className="ext-value">{Math.round(n).toLocaleString('de-DE')}</span>
         {def.unit && <span className="ext-target">{def.unit}</span>}
       </div>
+      {makros.length > 0 && (
+        <div className="ext-macros">
+          {makros.map((m) => (
+            <span key={m.name}>
+              <b>{Math.round(m.v)}</b> g {m.name === 'Kohlenhydrate' ? 'KH' : m.name}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="ext-note">aus Kalorienbrudi</div>
     </div>
   )

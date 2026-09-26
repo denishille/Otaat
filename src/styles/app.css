@@ -351,6 +351,7 @@ h2.section-title {
   letter-spacing: -.02em; margin-top: 2px;
 }
 .stat-tile-v small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.stat-tile-note { margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
 
 .chart-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -444,6 +445,17 @@ h2.section-title {
   font-variant-numeric: tabular-nums;
 }
 .ext-target { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+/* Die Makros unter den Kalorien. Eine Zeile, keine Kacheln — sie erlaeutern
+   die Zahl darueber und sollen ihr nicht den Rang ablaufen. */
+.ext-macros {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+.ext-macros b {
+  font-family: var(--mono); font-weight: 600; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .ext-note {
   font-family: var(--mono); font-size: 10px; color: var(--ink-4);
   text-transform: uppercase; letter-spacing: .09em;

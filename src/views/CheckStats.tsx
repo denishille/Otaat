@@ -3,8 +3,10 @@ import type { AppState, CheckDef } from '../lib/types'
 import { byWeekday, fmt, series, summarize, type Point } from '../lib/stats'
 import { findInsights, loggedDays, MIN_DAYS } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
-import { longDate, shortDate } from '../lib/dates'
+import { addDays, checkerToday, longDate, shortDate } from '../lib/dates'
 import { Sheet } from '../components/Sheet'
+import { countedValues } from '../lib/scoring'
+import { BRUDI_MACROS } from '../data/brudi-source'
 
 const RANGES = [30, 60, 90] as const
 
@@ -27,6 +29,40 @@ export function CheckStats({
       .filter((i) => i.a.check.id === def.id || i.b.check.id === def.id)
       .slice(0, 5)
   }, [state, def])
+
+  /**
+   * Die Makros zur Essens-Kachel. Keine eigene Rubrik mehr, aber im Detail
+   * gehoeren sie her — eine Kalorienzahl ohne die Aufteilung sagt wenig.
+   *
+   * Neben dem Schnitt in Gramm steht, wie viel der Energie daraus kam:
+   * Eiweiss und Kohlenhydrate mit 4 kcal je Gramm, Fett mit 9. Gerechnet
+   * wird ueber dieselben Tage wie der Verlauf daneben, und nur ueber Tage,
+   * an denen ueberhaupt Kalorien stehen.
+   */
+  const makros = useMemo(() => {
+    if (def.id !== 'brudi_kcal') return []
+    const ATOME: Record<string, number> = { brudi_protein: 4, brudi_carbs: 4, brudi_fat: 9 }
+    const summe: Record<string, { g: number; n: number }> = {}
+    let kcal = 0
+    for (let i = days - 1; i >= 0; i--) {
+      const v = countedValues(state, addDays(checkerToday(), -i))
+      if (typeof v['brudi_kcal'] !== 'number') continue
+      kcal += v['brudi_kcal']
+      for (const m of BRUDI_MACROS) {
+        const g = v[m.key]
+        if (typeof g !== 'number') continue
+        const a = (summe[m.key] ??= { g: 0, n: 0 })
+        a.g += g
+        a.n++
+      }
+    }
+    return BRUDI_MACROS.flatMap((m) => {
+      const a = summe[m.key]
+      if (!a?.n) return []
+      const anteil = kcal > 0 ? Math.round((a.g * ATOME[m.key] * 100) / kcal) : null
+      return [{ name: m.name, schnitt: Math.round(a.g / a.n), anteil }]
+    })
+  }, [state, def, days])
 
   return (
     <Sheet
@@ -63,6 +99,18 @@ export function CheckStats({
           : <Trend def={def} points={points} rate={sum.isRate} avg={sum.avg} />}
       </section>
 
+      {makros.length > 0 && (
+        <section>
+          <div className="chart-head"><h4>Makros im Schnitt</h4></div>
+          <div className="stat-row">
+            {makros.map((m) => (
+              <Tile key={m.name} k={m.name} v={`${m.schnitt} g`}
+                note={m.anteil === null ? undefined : `${m.anteil} % der Energie`} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {sum.n >= 7 && (
         <section>
           <div className="chart-head"><h4>Nach Wochentag</h4></div>
@@ -81,11 +129,14 @@ export function CheckStats({
   )
 }
 
-function Tile({ k, v, sub }: { k: string; v: string; sub?: string }) {
+function Tile({ k, v, sub, note }: { k: string; v: string; sub?: string; note?: string }) {
   return (
     <div className="stat-tile">
       <div className="daysum-k">{k}</div>
       <div className="stat-tile-v">{v}{sub && <small> {sub}</small>}</div>
+      {/* `sub` steht neben der Zahl und taugt nur fuer zwei Worte ("von 30").
+          Alles, was einen Satz braucht, kommt darunter. */}
+      {note && <div className="stat-tile-note">{note}</div>}
     </div>
   )
 }

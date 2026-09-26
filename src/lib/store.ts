@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 13
+const STATE_VERSION = 14
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -265,6 +265,20 @@ export function migrate(s: AppState): AppState {
   // Rubrik nach dem Versionssprung nicht ploetzlich leer dasteht.
   if ((s.meta.v ?? 1) < 13 && s.meta.brudiPerson === undefined) {
     if (next.some((c) => c.source === 'brudi')) s.meta.brudiPerson = 'Denis'
+  }
+
+  // Die Makros hatten fuer eine Fassung lang eigene Karten. Vier Kacheln fuer
+  // eine Mahlzeit sind aber keine vier Fragen, sondern eine Zahl mit drei
+  // Erlaeuterungen — sie stehen jetzt auf der Kalorien-Kachel.
+  //
+  // Die Rubriken fliegen raus, die **Werte in den Tagen bleiben**: sie gelten
+  // ab jetzt als gemessene Groessen ohne Karte, wie die Mikronaehrwerte, und
+  // gehen weiter in die Zusammenhangs-Suche. Ein Vermerk in `droppedChecks`
+  // waere hier falsch — das ist keine Entscheidung des Nutzers, und wer die
+  // Karten spaeter doch will, soll sie sich holen koennen.
+  if ((s.meta.v ?? 1) < 14) {
+    const weg = new Set(['brudi_protein', 'brudi_carbs', 'brudi_fat'])
+    for (let i = next.length - 1; i >= 0; i--) if (weg.has(next[i].id)) next.splice(i, 1)
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

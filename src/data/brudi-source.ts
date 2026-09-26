@@ -32,15 +32,25 @@ export interface BrudiField {
 }
 
 /**
- * Was als Rubrik im Checker steht. Mehr als Kalorien und die drei Makros
- * gehoert nicht auf den Tagesbogen — wer abends zwanzig Karten fuer Selen
- * und Vitamin K durchsieht, macht das genau einmal.
+ * Was als eigene Rubrik im Checker steht: die Kalorien, sonst nichts.
+ *
+ * Die Makros hatten kurzzeitig eigene Karten. Vier Kacheln fuer eine Mahlzeit
+ * sind aber keine vier Fragen — es ist eine Zahl mit drei Erlaeuterungen.
+ * Sie stehen jetzt **auf** der Kalorien-Kachel und in deren Detail.
  */
 export const BRUDI_CHECKS: BrudiField[] = [
-  { key: 'brudi_kcal',    col: 'kalorien_kcal',   name: 'Essen',        unit: 'kcal' },
-  { key: 'brudi_protein', col: 'protein_g',       name: 'Eiweiß',       unit: 'g' },
+  { key: 'brudi_kcal', col: 'kalorien_kcal', name: 'Essen', unit: 'kcal' },
+]
+
+/**
+ * Die drei Makros. Keine eigene Rubrik, aber auch nicht unsichtbar wie die
+ * Mikronaehrwerte: sie stehen als Zeile unter den Kalorien und als Kacheln
+ * im Detail. Gerechnet wird mit ihnen wie mit allem anderen Gemessenen.
+ */
+export const BRUDI_MACROS: BrudiField[] = [
+  { key: 'brudi_protein', col: 'protein_g',       name: 'Eiweiß',        unit: 'g' },
   { key: 'brudi_carbs',   col: 'kohlenhydrate_g', name: 'Kohlenhydrate', unit: 'g' },
-  { key: 'brudi_fat',     col: 'fett_g',          name: 'Fett',         unit: 'g' },
+  { key: 'brudi_fat',     col: 'fett_g',          name: 'Fett',          unit: 'g' },
 ]
 
 /**
@@ -54,6 +64,7 @@ export const BRUDI_CHECKS: BrudiField[] = [
  * mit seinen Kalorien. Grosser Wert heisst guter Tag.
  */
 export const BRUDI_HIDDEN: BrudiField[] = [
+  ...BRUDI_MACROS,
   { key: 'brudi_sugar',   col: 'zucker_g',        name: 'Zucker',        unit: 'g' },
   { key: 'brudi_fiber',   col: 'ballaststoffe_g', name: 'Ballaststoffe', unit: 'g' },
   { key: 'brudi_chol',    col: 'cholesterin_mg',  name: 'Cholesterin',   unit: 'mg' },
@@ -78,6 +89,9 @@ export const BRUDI_HIDDEN: BrudiField[] = [
 ]
 
 export const BRUDI_FIELDS: BrudiField[] = [...BRUDI_CHECKS, ...BRUDI_HIDDEN]
+
+/** Schluessel -> Makro, fuer die Anzeige auf der Kalorien-Kachel. */
+export const BRUDI_MACRO_KEYS = BRUDI_MACROS.map((f) => f.key)
 
 /** Die Schluessel, die im Tag liegen, ohne dass eine Rubrik dazu gehoert. */
 export const BRUDI_HIDDEN_KEYS = new Set(BRUDI_HIDDEN.map((f) => f.key))
