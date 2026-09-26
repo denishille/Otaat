@@ -309,6 +309,29 @@ h2.section-title {
 .scale button:hover { border-color: var(--ink-3); color: var(--ink); transform: translateY(-2px); }
 .scale button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
+/* Dauer: zwei Felder mit Einheit dahinter. Kein Plus/Minus — bei Minuten
+   waere die Schrittweite entweder zu grob oder man tippt ewig. */
+.duration { display: flex; gap: 8px; }
+.duration label {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 7px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface); padding: 0 11px 0 0; height: 44px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.duration label:focus-within { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash); }
+.duration input {
+  flex: 1 1 0; min-width: 0; height: 100%; padding: 0 0 0 11px;
+  background: none; border: 0; outline: none; color: var(--ink);
+  font-family: var(--mono); font-size: 17px; text-align: right;
+  -moz-appearance: textfield;
+}
+.duration input::-webkit-outer-spin-button,
+.duration input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.duration span {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+
 /* Number stepper */
 .stepper { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .stepper input {

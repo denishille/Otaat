@@ -27,6 +27,15 @@ export interface CheckDef {
   /** Niedriger ist besser (z.B. Social Media, Alkohol) */
   inverse?: boolean
   /**
+   * Eine Zahl in Stunden, die als Dauer gelesen wird: 7 h 43 min statt 7,7.
+   *
+   * Gespeichert bleiben Stunden als Kommazahl — daran haengen Zielwert,
+   * Verlauf und die ganze Statistik, und eine zweite Einheit im Bestand
+   * waere ein Wechselkurs, den irgendwann jemand vergisst. Es ist eine
+   * Frage der Darstellung, nicht der Ablage.
+   */
+  asDuration?: boolean
+  /**
    * Zusaetzlich zur Zahl eine Uhrzeit. Sie liegt unter einem eigenen
    * Schluessel im selben Tag (`timeKey`), nicht im Wert des Checks — ein
    * Check hat einen Wert, und aus 7,5 Stunden und 23:15 waere sonst ein

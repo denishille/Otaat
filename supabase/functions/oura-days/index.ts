@@ -196,8 +196,10 @@ Deno.serve(async (req) => {
     if (!tag) continue
     if (s.day) bettTag[String(s.day)] = tag
 
+    // Auf die Minute genau, nicht auf die Zehntelstunde: die Karte zeigt
+    // "7 h 43 min", und 0,1 h waere dort ein Sprung von sechs Minuten.
     const total = Number(s.total_sleep_duration ?? NaN)
-    if (Number.isFinite(total)) put(tag, 'sleep', r1(total / 3600))
+    if (Number.isFinite(total)) put(tag, 'sleep', Math.round(total / 60) / 60)
     // Von wann bis wann. `bedtime_end` ist das Aufstehen und gehoert auf
     // denselben Tag wie das Zubettgehen — die Nacht ist ein Eintrag.
     put(tag, 'sleep@time', clockOf(start))

@@ -632,7 +632,9 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
       <div className="check-top">
         <button onClick={onOpen} className="check-name" style={{ textAlign: 'left' }} title="Statistik ansehen">{def.name}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {def.unit && <span className="check-unit">{def.unit}</span>}
+          {/* Bei einer Dauer stehen die Einheiten schon an den Feldern; oben
+              noch einmal "h" waere neben "7 h 43 min" schlicht falsch. */}
+          {def.unit && !def.asDuration && <span className="check-unit">{def.unit}</span>}
           <button className="grip" onPointerDown={onGrip} aria-label="Verschieben" title="Verschieben"><Grip /></button>
         </div>
       </div>
@@ -688,6 +690,53 @@ function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOp
     case 'number': {
       const step = def.step ?? 1
       const num = typeof value === 'number' ? value : null
+
+      // Eine Dauer tippt man nicht als Kommazahl. Zwei Felder, Stunden und
+      // Minuten; gespeichert bleiben Stunden, auf die Minute genau gerundet.
+      if (def.asDuration) {
+        const gesamt = num === null ? null : Math.round(num * 60)
+        const setze = (h: number | null, m: number | null) => {
+          if (h === null && m === null) { onChange(null); return }
+          onChange(Math.round(((h ?? 0) * 60 + (m ?? 0))) / 60)
+        }
+        const h = gesamt === null ? '' : String(Math.floor(gesamt / 60))
+        const m = gesamt === null ? '' : String(gesamt % 60)
+        return (
+          <>
+            <div className="duration">
+              <label>
+                <input
+                  type="number" inputMode="numeric" min={0} max={24} placeholder="–"
+                  value={h}
+                  onChange={(e) => setze(e.target.value === '' ? null : Number(e.target.value), gesamt === null ? 0 : gesamt % 60)}
+                />
+                <span>h</span>
+              </label>
+              <label>
+                <input
+                  type="number" inputMode="numeric" min={0} max={59} placeholder="–"
+                  value={m}
+                  onChange={(e) => setze(gesamt === null ? 0 : Math.floor(gesamt / 60), e.target.value === '' ? null : Number(e.target.value))}
+                />
+                <span>min</span>
+              </label>
+            </div>
+            {def.withTime && (
+              <div className="timespan">
+                <label className="timefield">
+                  <span>ab</span>
+                  <input type="time" value={time} onChange={(e) => onTime(e.target.value)} />
+                </label>
+                <label className="timefield">
+                  <span>bis</span>
+                  <input type="time" value={endTime} onChange={(e) => onEndTime(e.target.value)} />
+                </label>
+              </div>
+            )}
+          </>
+        )
+      }
+
       const bump = (dir: number) => onChange(Math.max(0, Math.round(((num ?? 0) + dir * step) * 100) / 100))
       return (
         <>

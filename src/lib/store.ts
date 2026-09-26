@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 15
+const STATE_VERSION = 16
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -286,6 +286,13 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) < 15) {
     const r = next.find((c) => c.id === 'oura_readiness')
     if (r && r.name === 'Readiness') r.name = 'Tagesform'
+  }
+
+  // Schlaf wird als Dauer gelesen: 7 h 43 min statt 7,7. Gespeichert bleiben
+  // Stunden — es ist eine Frage der Darstellung, nicht der Ablage.
+  if ((s.meta.v ?? 1) < 16) {
+    const sleep = next.find((c) => c.id === 'sleep')
+    if (sleep && sleep.asDuration === undefined) sleep.asDuration = true
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

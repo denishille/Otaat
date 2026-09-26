@@ -78,7 +78,22 @@ export function byWeekday(points: Point[]): WeekdayStat[] {
 export function fmt(def: CheckDef, v: number | null, rate = false): string {
   if (v === null) return '–'
   if (rate) return `${Math.round(v * 100)} %`
+  if (def.asDuration) return dauer(v)
   // Deutsches Komma — die App spricht sonst auch deutsch.
   const rounded = String(Math.round(v * 10) / 10).replace('.', ',')
   return def.unit ? `${rounded} ${def.unit}` : rounded
+}
+
+/**
+ * Stunden als Dauer: 7,72 -> "7 h 43 min".
+ *
+ * Volle Stunden bleiben ohne Minuten stehen, sonst steht dort "8 h 0 min".
+ * Unter einer Stunde faellt die Stunde weg.
+ */
+export function dauer(stunden: number): string {
+  const min = Math.round(stunden * 60)
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
