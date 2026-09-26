@@ -53,6 +53,8 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
     // Gelesene Rubriken holen ihre Werte selbst — ein Vortagswert waere hier
     // eine Erfindung.
     if (def.kind === 'external') continue
+    // Was gemessen wird, faengt leer an — siehe `noCarry`.
+    if (def.noCarry) continue
     // Eine Notiz gehoert zu genau einem Tag. Uebernommen stuende dort heute
     // wieder "Lange Autofahrt", und man muesste jeden Morgen erst loeschen,
     // was gestern war. Notizen fangen leer an.

@@ -92,3 +92,11 @@ export const Sort = (p: P) => (
     <path d="M2.5 4h11M2.5 8h7M2.5 12h3.5" />
   </svg>
 )
+
+/* Pfeil nach oben / unten, fuer das Umsortieren in der Liste. */
+export const Up = (p: P) => (
+  <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}><path d="M8 13V3.5M3.5 8 8 3.5 12.5 8" /></svg>
+)
+export const Down = (p: P) => (
+  <svg viewBox="0 0 16 16" width="1em" height="1em" {...base} {...p}><path d="M8 3v9.5M3.5 8 8 12.5 12.5 8" /></svg>
+)

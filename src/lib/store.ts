@@ -7,7 +7,7 @@ import { SUPABASE_URL, T } from '../data/otaat-source'
 const LS_KEY = 'otaat.state.v1'
 
 /** Hochzaehlen, wenn `migrate` einen neuen Schritt bekommt. */
-const STATE_VERSION = 16
+const STATE_VERSION = 17
 
 export const FIRST_BOARD: Board = { id: 'board-1', name: 'Mein Board', createdAt: '' }
 
@@ -293,6 +293,34 @@ export function migrate(s: AppState): AppState {
   if ((s.meta.v ?? 1) < 16) {
     const sleep = next.find((c) => c.id === 'sleep')
     if (sleep && sleep.asDuration === undefined) sleep.asDuration = true
+  }
+
+  // Schlaf faengt jeden Tag leer an und traegt keine 8 Stunden mehr als
+  // Startwert. Solange der Ring nichts gemeldet hat, soll dort nichts stehen
+  // — eine uebernommene Zahl von gestern sieht aus wie ein Messwert.
+  //
+  // Und die Aufstehzeit wird fuer alte Tage nachgerechnet: Bettzeit plus
+  // Dauer. Das ist eine Schaetzung — die Zeit, die man wach im Bett lag,
+  // kennt der Eintrag nicht —, aber es ist die einzige, die aus den eigenen
+  // Zahlen folgt, und wo Oura spaeter etwas liefert, wird sie ersetzt.
+  if ((s.meta.v ?? 1) < 17) {
+    const sleep = next.find((c) => c.id === 'sleep')
+    if (sleep) {
+      delete sleep.fallback
+      if (sleep.noCarry === undefined) sleep.noCarry = true
+    }
+    for (const day of Object.values(s.days)) {
+      const dauer = day.values['sleep']
+      const ab = day.values['sleep@time']
+      if (typeof dauer !== 'number' || typeof ab !== 'string') continue
+      if (day.values['sleep@end'] !== undefined) continue
+      const m = /^(\d{1,2}):(\d{2})$/.exec(ab)
+      if (!m) continue
+      const ende = (Number(m[1]) * 60 + Number(m[2]) + Math.round(dauer * 60)) % 1440
+      const hh = String(Math.floor(ende / 60)).padStart(2, '0')
+      const mm = String(ende % 60).padStart(2, '0')
+      day.values['sleep@end'] = `${hh}:${mm}`
+    }
   }
 
   // Selbst angelegte Optionen, die eine frueherer Migration weggeworfen hat,

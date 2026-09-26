@@ -231,21 +231,40 @@ h2.section-title {
 /* Die Zeile ueber dem Raster. Haelt nur den Sortier-Knopf, rechtsbuendig,
    damit sie nichts vom Tag wegnimmt. */
 .grid-head { display: flex; justify-content: flex-end; margin-bottom: -4px; }
+.grid-head .btn { gap: 7px; }
 
-/* Die Auswahl im Sortier-Blatt: eine Liste, keine Knopfreihe — jede Zeile
-   traegt ihre Erklaerung. */
+/* Sortier-Blatt: oben die Handgriffe, darunter die Liste zum Verschieben. */
+.sortquick { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .sortlist {
   display: flex; flex-direction: column; gap: 1px; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+  margin: 0; padding: 0; list-style: none;
 }
-.sortlist button {
-  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
-  padding: 13px 15px; background: var(--surface); text-align: left;
-  transition: background .13s;
+.sortrow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px 7px 14px; background: var(--surface);
+  transition: background .3s;
 }
-.sortlist button:hover { background: var(--paper-sunk); }
-.sortlist b { font-size: 14.5px; font-weight: 600; }
-.sortlist span { font-size: 12.5px; color: var(--ink-3); }
+.sortrow-n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
+  width: 1.6em; flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+.sortrow-name { font-size: 14.5px; font-weight: 550; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortrow-art {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
+}
+.sortrow .iconbtn { flex-shrink: 0; }
+.sortrow .iconbtn[disabled] { opacity: .3; }
+/* Kurz anleuchten, wo die Zeile gelandet ist — sonst verliert man bei
+   zwanzig Zeilen die Spur, welche man gerade geschoben hat. */
+.sortrow--moved { background: var(--cobalt-wash); transition: none; }
+
+@media (max-width: 520px) {
+  .sortrow-art { display: none; }
+}
 
 .check-grid {
   display: grid; gap: 12px;

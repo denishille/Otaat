@@ -36,6 +36,15 @@ export interface CheckDef {
    */
   asDuration?: boolean
   /**
+   * Faengt jeden Tag leer an, statt den Wert vom Vortag zu uebernehmen.
+   *
+   * Fuer alles, was gemessen wird und nicht geschaetzt: beim Schlaf stuende
+   * sonst morgens die Zahl von gestern da, bis der Ring sie ersetzt — und
+   * bis dahin weiss man nicht, ob das der eigene Schlaf war oder ein Rest
+   * von vorgestern.
+   */
+  noCarry?: boolean
+  /**
    * Zusaetzlich zur Zahl eine Uhrzeit. Sie liegt unter einem eigenen
    * Schluessel im selben Tag (`timeKey`), nicht im Wert des Checks — ein
    * Check hat einen Wert, und aus 7,5 Stunden und 23:15 waere sonst ein

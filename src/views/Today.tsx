@@ -9,7 +9,7 @@ import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { applyOuraDays, fetchOura } from '../lib/oura'
 import { BRUDI_HIDDEN_KEYS, BRUDI_MACROS } from '../data/brudi-source'
-import { Check, ChevL, ChevR, Grip, Pencil, Plus, Sort, Trash, X } from '../components/Icons'
+import { Check, ChevL, ChevR, Down, Grip, Pencil, Plus, Sort, Trash, Up, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { useSwipe } from '../lib/swipe'
@@ -431,8 +431,8 @@ export function Today() {
 
       {shownDefs.length > 1 && (
         <div className="grid-head">
-          <button className="btn btn--quiet btn--sm" onClick={() => setSorting(true)}>
-            <Sort /> Sortieren
+          <button className="btn btn--ghost btn--sm" onClick={() => setSorting(true)}>
+            <Sort /> Ordnen
           </button>
         </div>
       )}
@@ -540,15 +540,34 @@ function SortSheet({ defs, values, onClose }: {
 }) {
   const ARTEN: CheckKind[] = ['external', 'number', 'scale', 'bool', 'multi', 'choice', 'text']
 
-  function anwenden(name: string, cmp: (a: CheckDef, b: CheckDef) => number) {
-    const reihe = [...defs].sort(cmp).map((d) => d.id)
+  /* Die Reihenfolge wird hier bearbeitet und erst beim Schliessen
+     festgeschrieben. Sonst schreibt jeder Pfeiltipp in den Bestand und
+     schiebt einen Abgleich an. */
+  const [reihe, setReihe] = useState<CheckDef[]>(defs)
+  const [gefasst, setGefasst] = useState<string | null>(null)
+
+  function schieben(i: number, dir: number) {
+    const j = i + dir
+    if (j < 0 || j >= reihe.length) return
+    const next = [...reihe]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setReihe(next)
+    setGefasst(next[j].id)
+  }
+
+  function sortieren(cmp: (a: CheckDef, b: CheckDef) => number) {
+    setReihe([...reihe].sort(cmp))
+    setGefasst(null)
+  }
+
+  function fertig() {
+    const ids = reihe.map((d) => d.id)
     update((d) => {
-      reihe.forEach((id, i) => {
+      ids.forEach((id, i) => {
         const c = d.checks.find((x) => x.id === id)
         if (c) c.sort = (i + 1) * 10
       })
     })
-    toast(name)
     onClose()
   }
 
@@ -556,33 +575,41 @@ function SortSheet({ defs, values, onClose }: {
 
   return (
     <Sheet
-      title="Sortieren"
-      onClose={onClose}
-      footer={<button className="btn btn--quiet" onClick={onClose}>Abbrechen</button>}
+      title="Rubriken ordnen"
+      onClose={fertig}
+      footer={<button className="btn btn--primary" onClick={fertig}>Fertig</button>}
     >
-      <div className="sortlist">
-        <button onClick={() => anwenden('Nach Name sortiert', nachName)}>
-          <b>Nach Name</b><span>A bis Z</span>
-        </button>
-
-        <button onClick={() => anwenden('Nach Art sortiert', (a, b) => {
+      {/* Erst die vier Handgriffe, die zwanzig Pfeiltipps ersparen. */}
+      <div className="sortquick">
+        <button className="btn btn--quiet btn--sm" onClick={() => sortieren(nachName)}>A–Z</button>
+        <button className="btn btn--quiet btn--sm" onClick={() => sortieren((a, b) => {
           const d = ARTEN.indexOf(a.kind) - ARTEN.indexOf(b.kind)
           return d !== 0 ? d : nachName(a, b)
-        })}>
-          <b>Nach Art</b><span>Gemessenes, Zahlen, Skalen, Ja/Nein, Auswahl, Notizen</span>
-        </button>
-
-        <button onClick={() => anwenden('Offene zuerst', (a, b) => {
+        })}>Nach Art</button>
+        <button className="btn btn--quiet btn--sm" onClick={() => sortieren((a, b) => {
           const d = Number(isFilled(values[a.id])) - Number(isFilled(values[b.id]))
-          return d !== 0 ? d : a.sort - b.sort
-        })}>
-          <b>Offene zuerst</b><span>was für diesen Tag noch fehlt, nach oben</span>
-        </button>
-
-        <button onClick={() => anwenden('Umgedreht', (a, b) => b.sort - a.sort)}>
-          <b>Umdrehen</b><span>die jetzige Reihenfolge von hinten</span>
-        </button>
+          return d !== 0 ? d : reihe.indexOf(a) - reihe.indexOf(b)
+        })}>Offene zuerst</button>
+        <button className="btn btn--quiet btn--sm" onClick={() => setReihe([...reihe].reverse())}>Umdrehen</button>
       </div>
+
+      {/* Und die Liste zum Verschieben. Pfeile statt Ziehen: in einem Blatt,
+          das selbst scrollt, ist ein Zug ueber zwanzig Zeilen eine Zumutung —
+          und auf dem Handy trifft man den Griff ohnehin schlechter als eine
+          Taste. */}
+      <ol className="sortlist">
+        {reihe.map((d, i) => (
+          <li key={d.id} className={'sortrow' + (gefasst === d.id ? ' sortrow--moved' : '')}>
+            <span className="sortrow-n">{i + 1}</span>
+            <span className="sortrow-name">{d.name}</span>
+            <span className="sortrow-art">{kindLabel(d)}</span>
+            <button className="iconbtn" disabled={i === 0} aria-label="nach oben"
+              onClick={() => schieben(i, -1)}><Up /></button>
+            <button className="iconbtn" disabled={i === reihe.length - 1} aria-label="nach unten"
+              onClick={() => schieben(i, 1)}><Down /></button>
+          </li>
+        ))}
+      </ol>
     </Sheet>
   )
 }

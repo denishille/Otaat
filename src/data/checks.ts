@@ -34,8 +34,8 @@ export const CHECK_CATALOG: CheckGroup[] = [
         // Bleibt eine Zahl zum Eintragen, auch wenn der Ring verbunden ist:
         // an einer Nacht ohne Ring soll man sie trotzdem nachtragen koennen.
         // Oura fuellt nur, was leer ist — siehe `Today.tsx`.
-        def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8, withTime: true, asDuration: true },
-        note: 'mit Uhrzeit, wann du ins Bett bist — der Oura-Ring füllt beides selbst',
+        def: { id: 'sleep', name: 'Schlaf', kind: 'number', unit: 'h', step: 0.5, target: 8, withTime: true, asDuration: true, noCarry: true },
+        note: 'von wann bis wann — der Oura-Ring trägt es selbst ein',
       },
       { def: { id: 'work', name: 'Arbeit', kind: 'number', unit: 'h', step: 0.5, target: 8, fallback: 8 } },
     ],
