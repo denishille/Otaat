@@ -218,31 +218,6 @@ export function Today() {
     })
   }
 
-  /**
-   * Einen gemessenen Wert fuer diesen Tag wegwerfen.
-   *
-   * Der Ring meldet auch Tage, an denen er nur nachts am Finger war. Acht
-   * Schritte sind dann kein Messwert, sondern ein Artefakt, und im Schnitt
-   * richtet es mehr Schaden an, als es Information bringt. Der Vermerk
-   * bleibt, sonst traegt ihn der naechste Abruf wieder ein.
-   */
-  function dropValue(def: CheckDef) {
-    update((d) => {
-      const day = (d.days[date] ??= blankDay(date))
-      delete day.values[def.id]
-      day.dropped = [...new Set([...(day.dropped ?? []), def.id])]
-    })
-    toast(`„${def.name}" für diesen Tag verworfen`)
-  }
-
-  function undropValue(def: CheckDef) {
-    update((d) => {
-      const day = d.days[date]
-      if (day) day.dropped = (day.dropped ?? []).filter((k) => k !== def.id)
-    })
-    toast('kommt beim nächsten Abruf wieder')
-  }
-
   function setValue(def: CheckDef, value: CheckValue) {
     update((d) => {
       const day = (d.days[date] ??= blankDay(date))
@@ -490,8 +465,6 @@ export function Today() {
             externalState={def.kind === 'external' ? brudiState : undefined}
             dayValues={entry?.values}
             dropped={(entry?.dropped ?? []).includes(def.id)}
-            onDrop={() => dropValue(def)}
-            onUndrop={() => undropValue(def)}
           />
         ))}
 
@@ -580,6 +553,10 @@ function SortSheet({ defs, values, onClose }: {
      einen Abgleich an. */
   const [reihe, setReihe] = useState<CheckDef[]>(defs)
   const [zieht, setZieht] = useState<string | null>(null)
+  /* Was rausfliegen soll. Erst beim Schliessen wirklich — ein Tipp daneben
+     soll nicht gleich eine Rubrik kosten, und bis dahin holt derselbe Knopf
+     sie zurueck. */
+  const [raus, setRaus] = useState<string[]>([])
 
   const liste = useRef<HTMLOListElement>(null)
   const zeilen = useRef(new Map<string, HTMLLIElement | null>())
@@ -670,7 +647,11 @@ function SortSheet({ defs, values, onClose }: {
         const c = d.checks.find((x) => x.id === id)
         if (c) c.sort = (i + 1) * 10
       })
+      // Ueber `dropCheck`, damit eine verbundene Quelle sie nicht beim
+      // naechsten Start wieder nachtraegt.
+      for (const id of raus) dropCheck(d, id)
     })
+    if (raus.length) toast(`${raus.length} ${raus.length === 1 ? 'Rubrik' : 'Rubriken'} entfernt`)
     onClose()
   }
 
@@ -680,7 +661,16 @@ function SortSheet({ defs, values, onClose }: {
     <Sheet
       title="Rubriken ordnen"
       onClose={fertig}
-      footer={<button className="btn btn--primary" onClick={fertig}>Fertig</button>}
+      footer={
+        <>
+          {raus.length > 0 && (
+            <span style={{ marginRight: 'auto', fontSize: 13, color: 'var(--ink-3)' }}>
+              {raus.length} {raus.length === 1 ? 'Rubrik fliegt' : 'Rubriken fliegen'} raus — erfasste Tage bleiben
+            </span>
+          )}
+          <button className="btn btn--primary" onClick={fertig}>Fertig</button>
+        </>
+      }
     >
       {/* Erst die vier Handgriffe, die zwanzig Pfeiltipps ersparen. */}
       <div className="sortquick">
@@ -709,11 +699,17 @@ function SortSheet({ defs, values, onClose }: {
           <li
             key={d.id}
             ref={(el) => { zeilen.current.set(d.id, el) }}
-            className={'sortrow' + (zieht === d.id ? ' sortrow--dragging' : '')}
+            className={'sortrow' + (zieht === d.id ? ' sortrow--dragging' : '') + (raus.includes(d.id) ? ' sortrow--raus' : '')}
           >
             <span className="sortrow-n">{i + 1}</span>
             <span className="sortrow-name">{d.name}</span>
             <span className="sortrow-art">{kindLabel(d)}</span>
+            <button
+              className="iconbtn sortrow-weg"
+              aria-label={raus.includes(d.id) ? `${d.name} behalten` : `${d.name} entfernen`}
+              title={raus.includes(d.id) ? 'doch behalten' : 'entfernen'}
+              onClick={() => setRaus((cur) => cur.includes(d.id) ? cur.filter((x) => x !== d.id) : [...cur, d.id])}
+            >{raus.includes(d.id) ? <Plus /> : <Trash />}</button>
             <button
               className="grip sortrow-grip"
               aria-label={`${d.name} verschieben`}
@@ -749,11 +745,9 @@ interface CardProps {
   dayValues?: Record<string, CheckValue>
   /** Fuer diesen Tag weggeworfen? Nur bei gelesenen Rubriken. */
   dropped?: boolean
-  onDrop?: () => void
-  onUndrop?: () => void
 }
 
-function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, endTime, onEndTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues, dropped, onDrop, onUndrop }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, endTime, onEndTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues, dropped }: CardProps) {
   const filled = isFilled(value)
 
   /**
@@ -782,10 +776,6 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
           {/* Bei einer Dauer stehen die Einheiten schon an den Feldern; oben
               noch einmal "h" waere neben "7 h 43 min" schlicht falsch. */}
           {def.unit && !def.asDuration && <span className="check-unit">{def.unit}</span>}
-          {/* Nur bei Gemessenem und nur, wenn fuer heute etwas dasteht. */}
-          {def.kind === 'external' && (dropped
-            ? <button className="iconbtn" onClick={onUndrop} aria-label="Wert zurückholen" title="Wert zurückholen"><Plus /></button>
-            : isFilled(value) && <button className="iconbtn" onClick={onDrop} aria-label="Wert verwerfen" title="Wert für diesen Tag verwerfen"><Trash /></button>)}
           <button className="grip" onPointerDown={onGrip} aria-label="Verschieben" title="Verschieben"><Grip /></button>
         </div>
       </div>

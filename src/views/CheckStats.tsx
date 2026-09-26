@@ -6,6 +6,8 @@ import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, checkerToday, longDate, shortDate } from '../lib/dates'
 import { Sheet } from '../components/Sheet'
 import { countedValues } from '../lib/scoring'
+import { update } from '../lib/store'
+import { toast } from '../components/Toasts'
 import { BRUDI_MACROS } from '../data/brudi-source'
 
 const RANGES = [30, 60, 90] as const
@@ -64,6 +66,31 @@ export function CheckStats({
     })
   }, [state, def, days])
 
+  /**
+   * Einen gemessenen Wert fuer einen Tag wegwerfen.
+   *
+   * Stand frueher als Papierkorb auf jeder gelesenen Kachel und war dort
+   * jeden Tag im Weg, obwohl man ihn im Monat einmal braucht. Hier, am
+   * gegriffenen Balken, ist er da, wo man den Ausreisser ohnehin sieht —
+   * und er gilt fuer jeden Tag, nicht nur fuer heute.
+   */
+  function verwirf(datum: string) {
+    update((d) => {
+      const day = (d.days[datum] ??= { date: datum, values: {}, confirmed: false })
+      delete day.values[def.id]
+      day.dropped = [...new Set([...(day.dropped ?? []), def.id])]
+    })
+    toast(`${shortDate(datum)} verworfen`)
+  }
+
+  function zurueck(datum: string) {
+    update((d) => {
+      const day = d.days[datum]
+      if (day) day.dropped = (day.dropped ?? []).filter((k) => k !== def.id)
+    })
+    toast('kommt beim nächsten Abruf wieder')
+  }
+
   return (
     <Sheet
       title={def.name}
@@ -96,7 +123,10 @@ export function CheckStats({
         </div>
         {sum.n === 0
           ? <div className="empty"><strong>Noch nichts erfasst.</strong>Trag den Check ein paar Tage ein, dann steht hier ein Verlauf.</div>
-          : <Trend def={def} points={points} rate={sum.isRate} avg={sum.avg} />}
+          : <Trend def={def} points={points} rate={sum.isRate} avg={sum.avg}
+              verwirf={def.kind === 'external' ? verwirf : undefined}
+              zurueck={def.kind === 'external' ? zurueck : undefined}
+              weggeworfen={(datum) => (state.days[datum]?.dropped ?? []).includes(def.id)} />}
       </section>
 
       {makros.length > 0 && (
@@ -144,7 +174,16 @@ function Tile({ k, v, sub, note }: { k: string; v: string; sub?: string; note?: 
 /* ---------------------------------------------------------------- */
 
 /** Ein Balken je Tag. Fehlende Tage bleiben leer statt interpoliert zu werden. */
-function Trend({ def, points, rate, avg }: { def: CheckDef; points: Point[]; rate: boolean; avg: number | null }) {
+function Trend({ def, points, rate, avg, verwirf, zurueck, weggeworfen }: {
+  def: CheckDef
+  points: Point[]
+  rate: boolean
+  avg: number | null
+  /** Nur bei gemessenen Rubriken gesetzt. */
+  verwirf?: (datum: string) => void
+  zurueck?: (datum: string) => void
+  weggeworfen: (datum: string) => boolean
+}) {
   const vals = points.map((p) => p.value).filter((v): v is number => v !== null)
   const top = Math.max(...vals, rate ? 1 : 0) || 1
 
@@ -189,8 +228,18 @@ function Trend({ def, points, rate, avg }: { def: CheckDef; points: Point[]; rat
         {sel ? (
           <span className="chart-pick">
             <b>{longDate(sel.date)}</b>
-            <span>{sel.value === null ? 'nichts erfasst' : fmt(def, sel.value, rate)}</span>
-            {sel.value !== null && avg !== null && <span>{compare(def, sel.value, avg, rate)}</span>}
+            <span>
+              {weggeworfen(sel.date) ? 'verworfen'
+                : sel.value === null ? 'nichts erfasst'
+                : fmt(def, sel.value, rate)}
+            </span>
+            {sel.value !== null && avg !== null && !weggeworfen(sel.date) && <span>{compare(def, sel.value, avg, rate)}</span>}
+            {/* Der Ring meldet auch Tage, an denen er nur nachts am Finger
+                war. So ein Wert gehoert nicht in den Schnitt. */}
+            {weggeworfen(sel.date)
+              ? zurueck && <button className="btn btn--quiet btn--sm" onClick={() => zurueck(sel.date)}>zurückholen</button>
+              : sel.value !== null && verwirf &&
+                <button className="btn btn--quiet btn--sm" onClick={() => verwirf(sel.date)}>verwerfen</button>}
           </span>
         ) : (
           <>

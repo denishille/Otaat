@@ -267,8 +267,16 @@ h2.section-title {
   font-family: var(--mono); font-size: 10px; color: var(--ink-4);
   text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
 }
-/* Der Griff braucht Platz zum Treffen, nicht nur zum Sehen. */
+/* Griff und Papierkorb brauchen Platz zum Treffen, nicht nur zum Sehen. */
 .sortrow-grip { flex-shrink: 0; width: 38px; height: 38px; }
+.sortrow-weg { flex-shrink: 0; width: 34px; height: 34px; }
+/* Was rausfliegt, bleibt sichtbar stehen, bis das Blatt zugeht — sonst
+   weiss man nach dem dritten Tipp nicht mehr, was man gerade wegwirft. */
+.sortrow--raus .sortrow-name { text-decoration: line-through; color: var(--ink-4); }
+.sortrow--raus .sortrow-n,
+.sortrow--raus .sortrow-art,
+.sortrow--raus .sortrow-grip { opacity: .35; }
+.sortrow--raus .sortrow-weg { color: var(--signal); }
 /* Die gefasste Zeile hebt sich ab, damit man sie beim Ziehen nicht verliert. */
 .sortrow--dragging {
   background: var(--cobalt-wash); transition: none;
@@ -488,6 +496,9 @@ h2.section-title {
   font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink);
 }
 .chart-pick > span:first-of-type { font-size: 11.5px; color: var(--ink-2); }
+/* Der Knopf zum Verwerfen steht in derselben Zeile wie der gegriffene Tag —
+   er gehoert zu dem Wert, der daneben steht, nicht zum Diagramm. */
+.chart-pick .btn { margin-left: auto; padding: 3px 10px; }
 
 /* Reihenfolge aendern */
 .grip {
