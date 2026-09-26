@@ -7,6 +7,7 @@ import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
+import { BRUDI_HIDDEN_KEYS } from '../data/brudi-source'
 import { Check, ChevL, ChevR, Grip, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
@@ -42,15 +43,22 @@ export function Today() {
   const carried = useMemo(() => carriedDefaults(state, date), [state, date])
 
   /**
-   * Die Essens-Rubrik zieht ihre Werte aus dem Kalorienbrudi-Bestand und
-   * schreibt sie in die Tage — dadurch rechnen Statistik und Zusammenhaenge
+   * Die Essens-Rubriken ziehen ihre Werte aus dem Kalorienbrudi-Bestand und
+   * schreiben sie in die Tage — dadurch rechnen Statistik und Zusammenhaenge
    * damit wie mit jedem anderen Check, und es steht auch ohne Netz noch da.
+   *
+   * Mitgeschrieben werden zwei Sorten: die Rubriken, die man sich ausgesucht
+   * hat (Kalorien, Makros), und die Mikronaehrwerte, die auf keiner Karte
+   * stehen. Letztere landen unter ihrem eigenen Schluessel im Tag und tauchen
+   * nur in der Zusammenhangs-Suche wieder auf.
    */
   const external = defs.filter((d) => d.kind === 'external')
+  const brudiDefs = external.filter((d) => d.source === 'brudi')
   const [brudiState, setBrudiState] = useState<'idle' | 'laden' | 'fehler'>('idle')
+  const brudiIds = brudiDefs.map((d) => d.id).join(',')
 
   useEffect(() => {
-    if (!external.length) return
+    if (!brudiIds) return
     const ctrl = new AbortController()
     setBrudiState('laden')
     void fetchBrudi(addDays(checkerToday(), -180), ctrl.signal).then((rows) => {
@@ -58,19 +66,23 @@ export function Today() {
       setBrudiState(rows.length ? 'idle' : 'fehler')
       if (!rows.length) return
 
-      const def = external.find((d) => d.source === 'brudi')
-      if (!def) return
+      // Nur die Rubriken, die auch tatsaechlich dastehen — wer die Makros
+      // nicht aus dem Regal geholt hat, bekommt sie nicht durch die Hintertuer.
+      const wanted = new Set(brudiIds.split(','))
 
       update((d) => {
         for (const row of rows) {
           const day = (d.days[row.date] ??= blankDay(row.date))
-          if (day.values[def.id] !== row.kcal) day.values[def.id] = row.kcal
+          for (const [key, v] of Object.entries(row.values)) {
+            if (!wanted.has(key) && !BRUDI_HIDDEN_KEYS.has(key)) continue
+            if (day.values[key] !== v) day.values[key] = v
+          }
         }
       })
     })
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [external.length])
+  }, [brudiIds])
 
   /**
    * Der heutige Tag startet mit den Werten vom letzten Mal — eingetragen,

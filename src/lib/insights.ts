@@ -1,5 +1,6 @@
 import type { AppState, CheckDef, CheckValue } from './types'
 import { addDays, checkerToday } from './dates'
+import { BRUDI_HIDDEN } from '../data/brudi-source'
 import { activeChecks, countedValues, scoreDay, timeKey } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
@@ -74,6 +75,13 @@ export interface Feature {
   check: CheckDef
   name: string
   values: (number | null)[]
+  /**
+   * Ein gemessener Wert ohne eigene Rubrik — die Mikronaehrwerte und die
+   * Einordnungen aus dem Essens-Bestand. Sie werden gegen alles Eigene
+   * gerechnet, aber nicht gegeneinander: dass Magnesium mit Kalium laeuft,
+   * ist wahr, uninteressant und kostet nur Korrektur-Budget.
+   */
+  hidden?: boolean
 }
 
 export interface Insight {
@@ -317,6 +325,19 @@ function features(s: AppState, dates: string[]): Feature[] {
     }
   }
 
+  // Die gemessenen Werte ohne Karte. Jeder bekommt einen eigenen Traeger,
+  // damit die Paar-Regel weiter ueber `check.id` laeuft.
+  for (const f of BRUDI_HIDDEN) {
+    const def: CheckDef = { id: f.key, name: f.name, kind: 'external', source: 'brudi', unit: f.unit, sort: 0 }
+    out.push({
+      id: f.key,
+      check: def,
+      name: f.name,
+      values: values.map((v) => (typeof v[f.key] === 'number' ? (v[f.key] as number) : null)),
+      hidden: true,
+    })
+  }
+
   // Was nie schwankt, kann mit nichts zusammenhaengen.
   return out.filter((f) => {
     const seen = f.values.filter((v): v is number => v !== null)
@@ -408,6 +429,7 @@ function search(feats: Feature[], span: number): Insight[] {
       // Die Optionen einer Mehrfachauswahl gegen ihren eigenen Check zu
       // rechnen ergaebe nur, dass Kraft ein Teil von Sport ist.
       if (a.check.id === b.check.id) continue
+      if (a.hidden && b.hidden) continue
       const xs: number[] = []
       const ys: number[] = []
       for (let k = 0; k < span; k++) {
@@ -425,6 +447,7 @@ function search(feats: Feature[], span: number): Insight[] {
   for (const a of feats) {
     for (const b of feats) {
       if (a.id === b.id || a.check.id === b.check.id) continue
+      if (a.hidden && b.hidden) continue
 
       for (const lag of LAGS) {
         const xs: number[] = []

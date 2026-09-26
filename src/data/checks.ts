@@ -59,6 +59,23 @@ export const CHECK_CATALOG: CheckGroup[] = [
         def: { id: 'brudi_kcal', name: 'Essen', kind: 'external', source: 'brudi', unit: 'kcal' },
         note: 'holt sich die Kalorien aus dem Kalorienbrudi-Bestand',
       },
+      // Die Makros aus derselben Quelle. Einzeln zu haben, weil nicht jeder
+      // alle drei auf dem Tagesbogen haben will — und weil ein Check einen
+      // Wert hat, sonst kommen Statistik und Verlauf mit der Karte nicht klar.
+      // Die Mikronaehrwerte stehen hier bewusst nicht: die kommen ohne Karte
+      // mit und gehen nur in die Zusammenhangs-Suche.
+      {
+        def: { id: 'brudi_protein', name: 'Eiweiß', kind: 'external', source: 'brudi', unit: 'g' },
+        note: 'Makro aus dem Kalorienbrudi-Bestand',
+      },
+      {
+        def: { id: 'brudi_carbs', name: 'Kohlenhydrate', kind: 'external', source: 'brudi', unit: 'g' },
+        note: 'Makro aus dem Kalorienbrudi-Bestand',
+      },
+      {
+        def: { id: 'brudi_fat', name: 'Fett', kind: 'external', source: 'brudi', unit: 'g' },
+        note: 'Makro aus dem Kalorienbrudi-Bestand',
+      },
     ],
   },
   {
