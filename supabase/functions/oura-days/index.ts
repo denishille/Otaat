@@ -198,7 +198,10 @@ Deno.serve(async (req) => {
 
     const total = Number(s.total_sleep_duration ?? NaN)
     if (Number.isFinite(total)) put(tag, 'sleep', r1(total / 3600))
+    // Von wann bis wann. `bedtime_end` ist das Aufstehen und gehoert auf
+    // denselben Tag wie das Zubettgehen — die Nacht ist ein Eintrag.
     put(tag, 'sleep@time', clockOf(start))
+    put(tag, 'sleep@end', clockOf(String(s.bedtime_end ?? '')))
 
     const inBed = Number(s.time_in_bed ?? NaN)
     if (Number.isFinite(inBed)) put(tag, 'oura_in_bed', r1(inBed / 3600))

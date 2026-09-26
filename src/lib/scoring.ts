@@ -5,6 +5,8 @@ import { CATALOG_CHECKS } from '../data/checks'
 
 /** Wo die Uhrzeit eines Checks im Tag liegt. Neben dem Wert, nicht darin. */
 export const timeKey = (id: string): string => `${id}@time`
+/** Das Gegenstueck: wann es vorbei war. Beim Schlaf das Aufstehen. */
+export const endKey = (id: string): string => `${id}@end`
 
 export const isFilled = (v: CheckValue | undefined): boolean => {
   if (v === undefined || v === null || v === '') return false
@@ -72,12 +74,13 @@ export function carriedDefaults(s: AppState, date: string): Record<string, Check
     }
     if (isFilled(value)) out[def.id] = value as CheckValue
 
-    // Die Uhrzeit wandert wie jeder andere Wert mit.
+    // Die Uhrzeiten wandern wie jeder andere Wert mit.
     if (!def.withTime) continue
-    const key = timeKey(def.id)
-    for (let i = 1; i <= CARRY_WINDOW; i++) {
-      const v = countedValues(s, addDays(date, -i))[key]
-      if (isFilled(v)) { out[key] = v; break }
+    for (const key of [timeKey(def.id), endKey(def.id)]) {
+      for (let i = 1; i <= CARRY_WINDOW; i++) {
+        const v = countedValues(s, addDays(date, -i))[key]
+        if (isFilled(v)) { out[key] = v; break }
+      }
     }
   }
   return out

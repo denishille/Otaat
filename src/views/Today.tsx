@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid } from '../lib/store'
 import type { AppState, CheckDef, CheckKind, CheckValue, DayEntry } from '../lib/types'
 import { CHECK_CATALOG, SCALE_MAX, scaleLabel, type CheckTemplate } from '../data/checks'
-import { activeChecks, carriedDefaults, dropCheck, ensureSourceChecks, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
+import { activeChecks, carriedDefaults, dropCheck, endKey, ensureSourceChecks, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
 import { addDays, longDate, checkerToday, today } from '../lib/dates'
@@ -406,6 +406,8 @@ export function Today() {
             onChange={(v) => setValue(def, v)}
             time={(entry?.values[timeKey(def.id)] as string) ?? ''}
             onTime={(v) => setRaw(timeKey(def.id), v || null)}
+            endTime={(entry?.values[endKey(def.id)] as string) ?? ''}
+            onEndTime={(v) => setRaw(endKey(def.id), v || null)}
             onOpen={() => setStats(def)}
             onAddOption={(o) => addOption(def, o)}
             onRemoveOption={(o) => removeOption(def, o)}
@@ -480,6 +482,8 @@ interface CardProps {
   onChange: (v: CheckValue) => void
   time: string
   onTime: (v: string) => void
+  endTime: string
+  onEndTime: (v: string) => void
   onOpen: () => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
@@ -489,7 +493,7 @@ interface CardProps {
   dayValues?: Record<string, CheckValue>
 }
 
-function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues }: CardProps) {
+function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange, time, onTime, endTime, onEndTime, onOpen, onAddOption, onRemoveOption, externalState, dayValues }: CardProps) {
   const filled = isFilled(value)
 
   /**
@@ -516,7 +520,7 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
         </div>
       </div>
 
-      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} dayValues={dayValues} />
+      <Input def={def} value={value} onChange={onChange} time={time} onTime={onTime} endTime={endTime} onEndTime={onEndTime} onAddOption={onAddOption} onRemoveOption={onRemoveOption} externalState={externalState} dayValues={dayValues} />
 
       {goalNames.length > 0 && (
         <div className="contrib">
@@ -533,12 +537,14 @@ function CheckCard({ def, value, goalNames, cardRef, dragging, onGrip, onChange,
   )
 }
 
-function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption, externalState, dayValues }: {
+function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOption, onRemoveOption, externalState, dayValues }: {
   def: CheckDef
   value: CheckValue
   onChange: (v: CheckValue) => void
   time: string
   onTime: (v: string) => void
+  endTime: string
+  onEndTime: (v: string) => void
   onAddOption: (option: string) => void
   onRemoveOption: (option: string) => void
   externalState?: 'idle' | 'laden' | 'fehler' | 'ohne'
@@ -578,10 +584,18 @@ function Input({ def, value, onChange, time, onTime, onAddOption, onRemoveOption
             <button onClick={() => bump(1)} aria-label="mehr">+</button>
           </div>
           {def.withTime && (
-            <label className="timefield">
-              <span>ins Bett</span>
-              <input type="time" value={time} onChange={(e) => onTime(e.target.value)} />
-            </label>
+            /* Von wann bis wann. Zwei Felder nebeneinander, damit klar ist,
+               dass es eine Spanne ist und nicht zwei Angaben. */
+            <div className="timespan">
+              <label className="timefield">
+                <span>ab</span>
+                <input type="time" value={time} onChange={(e) => onTime(e.target.value)} />
+              </label>
+              <label className="timefield">
+                <span>bis</span>
+                <input type="time" value={endTime} onChange={(e) => onEndTime(e.target.value)} />
+              </label>
+            </div>
           )}
         </>
       )

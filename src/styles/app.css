@@ -312,6 +312,11 @@ h2.section-title {
 
 /* Choice */
 /* Die Uhrzeit neben der Zahl — Schlaf hat beides. */
+/* Zwei Zeitfelder als Spanne. Auf dem Handy nebeneinander, sonst frisst die
+   Schlafkarte die halbe Seite. */
+.timespan { display: flex; gap: 8px; }
+.timespan .timefield { flex: 1 1 0; min-width: 0; gap: 7px; }
+
 .timefield {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--mono); font-size: 11px; letter-spacing: .04em;

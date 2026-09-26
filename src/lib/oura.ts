@@ -1,6 +1,5 @@
 import { supabase } from './supabase'
 import type { AppState, DayEntry } from './types'
-import { isFilled, timeKey } from './scoring'
 
 /* Schlaf- und Gesundheitswerte vom Ring.
    -----------------------------------------------------------------------
@@ -99,31 +98,29 @@ export async function ouraDisconnect(): Promise<string | null> {
  * Steht hier und nicht im Effekt, weil die eine interessante Regel darin
  * steckt und eine Regel, die man nicht pruefen kann, keine ist.
  *
- * **`sleep` und die Bettzeit werden nur gefuellt, wo nichts steht.** Die
- * Rubrik gab es lange vor dem Ring und sie ist von Hand gefuehrt worden;
- * hundert abgeschlossene Tage rueckwirkend zu ueberschreiben waere keine
- * Verbesserung, sondern Geschichtsklitterung — und die Zahlen, gegen die der
- * Zusammenhang-Finder bisher gerechnet hat, waeren plötzlich andere. Ab jetzt
- * ist das Feld frueh am Morgen leer, und dann traegt der Ring es ein.
- *
- * Alles, was nur der Ring kennt, wird immer geschrieben: da gibt es keinen
- * Handeintrag, den man ueberfahren koennte.
+ * **Wo der Ring etwas weiss, gilt der Ring** — auch fuer Schlafdauer, Zubett-
+ * und Aufstehzeit, und auch rueckwirkend. Die hat frueher die Hand gefuehrt,
+ * und eine Weile lang hat der Ring sie nur gefuellt, wo nichts stand; das
+ * hiess aber, dass auf der Karte weiter geschaetzte Zahlen standen, obwohl
+ * gemessene daneben lagen. Wo der Ring nichts hat — Nacht ohne Ring, Zeit vor
+ * der Verbindung —, bleibt der Handeintrag stehen und bleibt aenderbar.
  */
 export function applyOuraDays(
   draft: AppState,
   days: OuraDay[],
   leererTag: (date: string) => DayEntry,
 ): number {
-  const eigen = new Set(['sleep', timeKey('sleep')])
   let geschrieben = 0
   for (const row of days) {
     const day = (draft.days[row.date] ??= leererTag(row.date))
     for (const [key, v] of Object.entries(row.values)) {
-      if (eigen.has(key) && isFilled(day.values[key])) continue
       if (day.values[key] === v) continue
       day.values[key] = v
       geschrieben++
     }
+    // Einmal vom Ring gefuellt heisst: die Uebernahme vom Vortag hat hier
+    // nichts mehr zu suchen.
+    day.carried = [...new Set([...(day.carried ?? []), ...Object.keys(row.values)])]
   }
   return geschrieben
 }
