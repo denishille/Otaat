@@ -7,6 +7,7 @@
  *
  *   POST /functions/v1/oura-days   { from: "2026-06-01", to: "2026-09-26" }
  *   -> { days: [ { date, values: { ... } } ], connected: true }
+ *   POST /functions/v1/oura-days   { disconnect: true }
  *
  * Deploy:  supabase functions deploy oura-days
  *
@@ -163,20 +164,44 @@ Deno.serve(async (req) => {
     ;(days[tag] ??= {})[key] = v
   }
 
+  /*
+   * Je Tag genau eine Nacht.
+   *
+   * Oura liefert alles, was der Ring als Schlaf erkannt hat — auch das
+   * Nickerchen von einundzwanzig Minuten am Samstagnachmittag. Das stand
+   * danach als Schlafzeit da (`ab 15:13 bis 15:34`), weil es als letztes kam
+   * und die Nacht davor einfach ueberschrieben hat.
+   *
+   * Zwei Bedingungen. Der Typ `long_sleep` ist Oura's eigene Einordnung als
+   * Nachtschlaf und zaehlt immer. Alles andere braucht mindestens drei
+   * Stunden — die kurzen Stuecke sind Nickerchen, egal wie sie heissen, und
+   * `type` ist bei Oura nicht verlaesslich gesetzt. Bleiben mehrere uebrig,
+   * gewinnt die laengste; ein Tag hat eine Nacht. Eine in zwei Stuecke
+   * zerfallene Nacht verliert damit das kuerzere Stueck — lieber das als ein
+   * Nickerchen in der Summe.
+   */
+  const MIN_NACHT = 3 * 3600
+  const naechte = new Map<string, Record<string, unknown>>()
   for (const s of sessions) {
-    // Nickerchen sind kein Nachtschlaf und haetten in der Dauer nichts verloren.
-    if (s.type && s.type !== 'long_sleep' && s.type !== 'sleep') continue
-    const start = String(s.bedtime_start ?? '')
-    // Der Oura-Tag der Sitzung ist der Morgen danach. Genau dort gehoert sie hin.
+    const typ = String(s.type ?? '')
+    if (typ === 'deleted') continue
     const tag = s.day ? String(s.day) : null
-    if (!tag || !start) continue
+    if (!tag || !s.bedtime_start) continue
+    const dauer = Number(s.total_sleep_duration ?? 0)
+    if (typ !== 'long_sleep' && !(dauer >= MIN_NACHT)) continue
+    const bisher = naechte.get(tag)
+    if (!bisher || Number(bisher.total_sleep_duration ?? 0) < dauer) naechte.set(tag, s)
+  }
+
+  for (const [tag, s] of naechte) {
+    const start = String(s.bedtime_start ?? '')
 
     // Auf die Minute genau, nicht auf die Zehntelstunde: die Karte zeigt
     // "7 h 43 min", und 0,1 h waere dort ein Sprung von sechs Minuten.
     const total = Number(s.total_sleep_duration ?? NaN)
     if (Number.isFinite(total)) put(tag, 'sleep', Math.round(total / 60) / 60)
-    // Von wann bis wann. `bedtime_end` ist das Aufstehen und gehoert auf
-    // denselben Tag wie das Zubettgehen — die Nacht ist ein Eintrag.
+    // Von wann bis wann. Beide Zeiten stehen auf dem Tag des Aufwachens —
+    // die Nacht ist ein Eintrag.
     put(tag, 'sleep@time', clockOf(start))
     put(tag, 'sleep@end', clockOf(String(s.bedtime_end ?? '')))
 
