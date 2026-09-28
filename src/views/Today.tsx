@@ -905,6 +905,17 @@ function Input({ def, value, onChange, time, onTime, endTime, onEndTime, onAddOp
  * gibt, jemanden auf eine Schreibweise festzunageln: `7:43`, `7`, `7,5`,
  * `7.5`, `7h43`, `7 43`. Was nicht zu lesen ist, bleibt stehen, bis das Feld
  * den Fokus verliert — sonst springt einem die Eingabe beim Tippen weg.
+ *
+ * **Vier Ziffern ohne alles sind der Normalfall**, nicht die Ausnahme: auf
+ * dem Zahlenpad gibt es keinen Doppelpunkt. `930` ist 9:30, `0930` auch,
+ * `045` sind fuenfundvierzig Minuten. Die letzten beiden Ziffern sind immer
+ * die Minuten, davor stehen die Stunden.
+ *
+ * Zwei Ziffern bleiben Stunden, solange sie welche sein koennen — `12` ist
+ * zwoelf Stunden. `93` ist keine, also ist es auch keine Eingabe, sondern der
+ * halbe Weg zu `930`: unlesbar, und der Wert von vorher bleibt stehen. Genau
+ * daran lag es, dass aus getipptem `930` vorher `93:00` wurde und aus `0930`
+ * ein mageres `9:00` — die dritte Ziffer passte in kein Muster und fiel weg.
  */
 function DurationInput({ value, onChange }: { value: number | null; onChange: (v: CheckValue) => void }) {
   const zeige = (h: number | null) => {
@@ -933,9 +944,21 @@ function DurationInput({ value, onChange }: { value: number | null; onChange: (v
     }
     m = /^(\d{1,2})[.,](\d+)$/.exec(t)
     if (m) return Math.round(Number(`${m[1]}.${m[2]}`) * 60) / 60
-    m = /^(\d{1,2})h?$/.exec(t)
-    if (m) return Number(m[1])
+    m = /^(\d{1,4})$/.exec(t)
+    if (m) return ausZiffern(m[1])
     return undefined
+  }
+
+  /** Blanke Ziffern vom Zahlenpad: `930` -> 9:30, `0930` -> 9:30, `7` -> 7:00. */
+  function ausZiffern(z: string): number | undefined {
+    if (z.length <= 2) {
+      const h = Number(z)
+      return h <= 24 ? h : undefined
+    }
+    const h = Number(z.slice(0, -2))
+    const min = Number(z.slice(-2))
+    if (h > 24 || min > 59) return undefined
+    return (h * 60 + min) / 60
   }
 
   return (
