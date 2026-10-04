@@ -13,6 +13,17 @@ export interface OuraField {
   key: string
   name: string
   unit?: string
+  /**
+   * Welche Messung der Wert beschreibt.
+   *
+   * Eine Nacht liefert ein Dutzend Zahlen, die alle dieselbe Nacht sind:
+   * Dauer, Tiefschlaf, Effizienz, HRV, Schlaf-Score, Tagesform. Dass die
+   * miteinander laufen, ist keine Entdeckung, sondern die Messung selbst —
+   * der Zusammenhang-Finder laesst Paare aus derselben Gruppe deshalb aus.
+   * Die Tagesform haengt hier mit dran: Oura rechnet sie aus HRV, Ruhepuls
+   * und Schlaf aus, sie ist kein unabhaengiger Wert.
+   */
+  gruppe: 'nacht' | 'bewegung'
 }
 
 /**
@@ -23,10 +34,10 @@ export interface OuraField {
  * eine Reihe bleiben. Es wechselt nur die Quelle, nicht die Groesse.
  */
 export const OURA_CHECKS: OuraField[] = [
-  { key: 'sleep',             name: 'Schlaf',      unit: 'h' },
-  { key: 'oura_sleep_score',  name: 'Schlaf-Score' },
-  { key: 'oura_readiness',    name: 'Tagesform' },
-  { key: 'oura_steps',        name: 'Schritte' },
+  { key: 'sleep',             name: 'Schlaf',      unit: 'h', gruppe: 'nacht' },
+  { key: 'oura_sleep_score',  name: 'Schlaf-Score',           gruppe: 'nacht' },
+  { key: 'oura_readiness',    name: 'Tagesform',              gruppe: 'nacht' },
+  { key: 'oura_steps',        name: 'Schritte',               gruppe: 'bewegung' },
 ]
 
 /**
@@ -36,19 +47,22 @@ export const OURA_CHECKS: OuraField[] = [
  * niemand hakt sie abends ab.
  */
 export const OURA_HIDDEN: OuraField[] = [
-  { key: 'oura_rhr',         name: 'Ruhepuls',      unit: 'bpm' },
-  { key: 'oura_hrv',         name: 'HRV',           unit: 'ms' },
-  { key: 'oura_temp',        name: 'Temperatur',    unit: '°C' },
-  { key: 'oura_breath',      name: 'Atemfrequenz',  unit: '/min' },
-  { key: 'oura_efficiency',  name: 'Schlafeffizienz', unit: '%' },
-  { key: 'oura_in_bed',      name: 'Zeit im Bett',  unit: 'h' },
-  { key: 'oura_deep',        name: 'Tiefschlaf',    unit: 'min' },
-  { key: 'oura_rem',         name: 'REM-Schlaf',    unit: 'min' },
-  { key: 'oura_light',       name: 'Leichtschlaf',  unit: 'min' },
-  { key: 'oura_awake',       name: 'Wach in der Nacht', unit: 'min' },
-  { key: 'oura_latency',     name: 'Einschlafdauer', unit: 'min' },
-  { key: 'oura_active_kcal', name: 'Aktivkalorien', unit: 'kcal' },
-  { key: 'oura_met',         name: 'MET-Minuten' },
+  { key: 'oura_rhr',         name: 'Ruhepuls',      unit: 'bpm', gruppe: 'nacht' },
+  { key: 'oura_hrv',         name: 'HRV',           unit: 'ms', gruppe: 'nacht' },
+  { key: 'oura_temp',        name: 'Temperatur',    unit: '°C', gruppe: 'nacht' },
+  { key: 'oura_breath',      name: 'Atemfrequenz',  unit: '/min', gruppe: 'nacht' },
+  { key: 'oura_efficiency',  name: 'Schlafeffizienz', unit: '%', gruppe: 'nacht' },
+  { key: 'oura_in_bed',      name: 'Zeit im Bett',  unit: 'h', gruppe: 'nacht' },
+  { key: 'oura_deep',        name: 'Tiefschlaf',    unit: 'min', gruppe: 'nacht' },
+  { key: 'oura_rem',         name: 'REM-Schlaf',    unit: 'min', gruppe: 'nacht' },
+  { key: 'oura_light',       name: 'Leichtschlaf',  unit: 'min', gruppe: 'nacht' },
+  { key: 'oura_awake',       name: 'Wach in der Nacht', unit: 'min', gruppe: 'nacht' },
+  { key: 'oura_latency',     name: 'Einschlafdauer', unit: 'min', gruppe: 'nacht' },
+  { key: 'oura_active_kcal', name: 'Aktivkalorien', unit: 'kcal', gruppe: 'bewegung' },
+  { key: 'oura_met',         name: 'MET-Minuten', gruppe: 'bewegung' },
 ]
 
 export const OURA_HIDDEN_KEYS = new Set(OURA_HIDDEN.map((f) => f.key))
+
+/** Alles vom Ring, mit Karte und ohne — fuer die Gruppenzuordnung. */
+export const OURA_FIELDS: OuraField[] = [...OURA_CHECKS, ...OURA_HIDDEN]

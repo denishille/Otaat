@@ -1,6 +1,6 @@
 import type { AppState, CheckDef, CheckValue } from './types'
 import { addDays, checkerToday } from './dates'
-import { HIDDEN_MEASURES } from '../data/measured'
+import { HIDDEN_MEASURES, gebilde } from '../data/measured'
 import { activeChecks, countedValues, endKey, scoreDay, timeKey } from './scoring'
 
 /* Zusammenhaenge zwischen den Checks.
@@ -42,6 +42,25 @@ export const MIN_DAYS = 21
 const MIN_PAIRS = 14
 /** Unter dieser Staerke ist ein Zusammenhang zwar echt, aber belanglos. */
 const MIN_R = 0.35
+/**
+ * So viele Tage muessen von der haeufigsten Auspraegung abweichen.
+ *
+ * "Unterkörper" stand an genau einem Tag im Sport, Kreatin war an genau zwei
+ * Tagen aus — und einer davon lag zwei Tage davor. Daraus wurde eine
+ * Rangkorrelation von -1,00 mit einem p-Wert jenseits von Gut und Boese, als
+ * "sehr deutlich" ausgewiesen. Es war ein Tag.
+ *
+ * Ein einzelner Punkt kann keinen Zusammenhang tragen, egal was die Formel
+ * dazu sagt: der t-Test misst, wie gut die Punkte auf einer Linie liegen,
+ * und durch einen Punkt legt sich jede Linie perfekt. Die Pruefung auf
+ * "schwankt ueberhaupt" reichte dafuer nicht, die besteht schon eine Reihe
+ * aus achtzehn Nullen und einer Eins.
+ *
+ * Gezaehlt wird in den tatsaechlich verglichenen Paaren, nicht in der ganzen
+ * Reihe — sonst rettet ein Merkmal seine Abwechslung aus Tagen, an denen das
+ * andere gar nichts hat.
+ */
+const MIN_VARY = 5
 /** Was nach der Korrektur weiter als das entfernt liegt, ist kein Hinweis
     mehr, sondern Rauschen — und wird gar nicht erst zurueckgegeben. */
 const HINT_Q = 0.5
@@ -287,6 +306,24 @@ function effectiveN(xs: number[], ys: number[]): number {
   return Math.max(4, Math.min(n, eff))
 }
 
+/**
+ * Haengt die Reihe an mehr als einer Handvoll Punkten?
+ *
+ * Gezaehlt wird, wie oft die haeufigste Auspraegung vorkommt; der Rest ist
+ * das, woran ein Zusammenhang ueberhaupt sichtbar werden koennte. Bei Ja/Nein
+ * ist das die seltenere Seite, bei einer Skala die Tage neben dem Normalwert.
+ */
+function genugAbwechslung(xs: number[]): boolean {
+  const zaehl = new Map<number, number>()
+  let haeufigste = 0
+  for (const x of xs) {
+    const n = (zaehl.get(x) ?? 0) + 1
+    zaehl.set(x, n)
+    if (n > haeufigste) haeufigste = n
+  }
+  return xs.length - haeufigste >= MIN_VARY
+}
+
 /** Korrelation von x und y, nachdem z aus beiden herausgerechnet wurde. */
 function partial(rxy: number, rxz: number, ryz: number): number | null {
   const den = Math.sqrt((1 - rxz * rxz) * (1 - ryz * ryz))
@@ -388,6 +425,19 @@ function load(values: (number | null)[], i: number, w: number): number | null {
 type Raw = Omit<Insight, 'q' | 'solid'>
 
 /**
+ * Zwei Zahlen aus derselben Messung — Kalorien und ihre Kohlenhydrate,
+ * Schlafdauer und Tiefschlaf. Siehe `gebilde()`.
+ */
+function selbeMessung(a: Feature, b: Feature): boolean {
+  const ga = gebilde(a.id)
+  return ga !== null && ga === gebilde(b.id)
+}
+
+/** Ja/Nein und Mehrfachauswahl sind Haken, keine Hoehe — "hoch" passt da nicht. */
+export const isFlag = (f: Feature): boolean =>
+  f.check.kind === 'bool' || f.check.kind === 'multi'
+
+/**
  * Ein paar Tausend Tests kosten auf dem Handy ein Viertel einer Sekunde. Der
  * Checker und das Detail einer Rubrik fragen beide, und der State wird bei
  * jedem Tastendruck neu geklont — deshalb ein Gedaechtnis. Der Schluessel ist
@@ -419,6 +469,9 @@ function search(feats: Feature[], span: number): Insight[] {
    */
   const run = (a: Feature, b: Feature, shift: Shift, xs: number[], ys: number[], zs: number[] | null) => {
     if (xs.length < MIN_PAIRS) return
+    // Ein Test, der an zwei Punkten haengt, ist kein Test. Er zaehlt deshalb
+    // auch nicht fuer die Korrektur — er wird ja nicht durchgefuehrt.
+    if (!genugAbwechslung(xs) || !genugAbwechslung(ys)) return
     tests++
     const rx = ranks(xs)
     const ry = ranks(ys)
@@ -453,6 +506,7 @@ function search(feats: Feature[], span: number): Insight[] {
       // rechnen ergaebe nur, dass Kraft ein Teil von Sport ist.
       if (a.check.id === b.check.id) continue
       if (a.hidden && b.hidden) continue
+      if (selbeMessung(a, b)) continue
       const xs: number[] = []
       const ys: number[] = []
       for (let k = 0; k < span; k++) {
@@ -471,6 +525,7 @@ function search(feats: Feature[], span: number): Insight[] {
     for (const b of feats) {
       if (a.id === b.id || a.check.id === b.check.id) continue
       if (a.hidden && b.hidden) continue
+      if (selbeMessung(a, b)) continue
 
       for (const lag of LAGS) {
         const xs: number[] = []

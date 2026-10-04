@@ -1,4 +1,4 @@
-import { spanLabel, strengthLabel, whenLabel, type Insight } from '../lib/insights'
+import { isFlag, spanLabel, strengthLabel, whenLabel, type Feature, type Insight } from '../lib/insights'
 
 /** Eindeutig fuer React, ohne den ganzen Datensatz zu serialisieren. */
 export const insightKey = (i: Insight) =>
@@ -7,22 +7,16 @@ export const insightKey = (i: Insight) =>
 /**
  * Eine Zeile Zusammenhang. Steht im Checker unter der Kopfzeile und im
  * Detail einer Rubrik — deshalb hier und nicht zweimal.
+ *
+ * Ja/Nein-Rubriken brauchen eigene Worte. "War Kreatin hoch" ergibt keinen
+ * Satz: an einem Haken gibt es keine Hoehe, nur ob er dran war. Dasselbe auf
+ * der anderen Seite — "war Sauna meist hoch" statt "gab es Sauna meist auch".
  */
 export function InsightRow({ i }: { i: Insight }) {
-  const dir = i.r > 0 ? 'hoch' : 'niedrig'
   return (
     <div className={'insight' + (i.solid ? '' : ' insight--weak')}>
       <div className="insight-text">
-        {i.shift.kind === 'load' ? (
-          <>
-            Nach <b>{spanLabel(i.shift.days)}</b> mit viel <b>{i.a.name}</b> war <b>{i.b.name}</b>{' '}
-            meist <b>{dir}</b>.
-          </>
-        ) : (
-          <>
-            War <b>{i.a.name}</b> hoch, war <b>{i.b.name}</b> {whenLabel(i.shift)} meist <b>{dir}</b>.
-          </>
-        )}
+        {ursache(i.a, i.shift)} {wirkung(i.b, i.shift, i.r)}.
       </div>
       <div className="insight-meta">
         <span>{strengthLabel(i.r)}</span>
@@ -33,4 +27,23 @@ export function InsightRow({ i }: { i: Insight }) {
       </div>
     </div>
   )
+}
+
+/** "An Tagen mit Sauna", "War Schlaf hoch,", "Nach einer Woche mit viel Sport" */
+function ursache(a: Feature, shift: Insight['shift']) {
+  const name = <b>{a.name}</b>
+  if (shift.kind === 'load') {
+    return <>Nach <b>{spanLabel(shift.days)}</b> mit {isFlag(a) ? 'oft' : 'viel'} {name}</>
+  }
+  return isFlag(a) ? <>An Tagen mit {name}</> : <>War {name} hoch,</>
+}
+
+/** "war Fokus am nächsten Tag meist hoch", "gab es Sauna am selben Tag meist nicht" */
+function wirkung(b: Feature, shift: Insight['shift'], r: number) {
+  const name = <b>{b.name}</b>
+  const wann = shift.kind === 'load' ? '' : ` ${whenLabel(shift)}`
+  if (isFlag(b)) {
+    return <>gab es {name}{wann} meist <b>{r > 0 ? 'auch' : 'nicht'}</b></>
+  }
+  return <>war {name}{wann} meist <b>{r > 0 ? 'hoch' : 'niedrig'}</b></>
 }
