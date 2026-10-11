@@ -194,14 +194,20 @@ export function Today() {
    * Blaettern. Ueber den Tag hinaus geht es nicht — morgen ist noch nicht
    * passiert.
    *
-   * Danach zurueck nach oben: nach einem Dutzend Rubriken steht man weit
-   * unten, und ein neu aufgeschlagener Tag faengt dann mitten im Formular an,
-   * ohne dass man das Datum sieht.
+   * **Die Stelle bleibt, wo sie ist.** Anfangs sprang die Seite nach jedem
+   * Wisch nach oben, damit man das Datum sieht. Beim Benutzen ist das
+   * verkehrt herum: wer unten beim Schlaf steht und zurueckblaettert, will
+   * den Schlaf von gestern sehen und nicht wieder durch ein Dutzend Rubriken
+   * scrollen. Das Datum steht ohnehin in der Kopfzeile, und welcher Tag
+   * gemeint ist, sagt einem die Rubrik unter dem Finger.
+   *
+   * Das Raster ist an beiden Tagen dasselbe, deshalb liegt dieselbe Karte
+   * nach dem Wechsel an derselben Stelle — es braucht kein Zurueckrechnen
+   * der Position, nur das Nichtstun.
    */
   function goDay(step: number) {
     if (step > 0 && isToday) return
     setDate(addDays(date, step))
-    window.scrollTo(0, 0)
   }
 
   // Wischen blaettert genauso: nach links das Naechste, nach rechts zurueck.
