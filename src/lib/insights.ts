@@ -324,6 +324,36 @@ function genugAbwechslung(xs: number[]): boolean {
   return xs.length - haeufigste >= MIN_VARY
 }
 
+/** Eine Reihe aus lauter Haken: Ja/Nein, oder eine Option einer Mehrfachauswahl. */
+const istBinaer = (xs: number[]): boolean => xs.every((x) => x === 0 || x === 1)
+
+/**
+ * Zwei Haken, die fast immer zusammen gesetzt werden, sind ein Haken.
+ *
+ * Kreatin und Im8 unterschieden sich an genau einem Tag von neunundzwanzig —
+ * dreiundzwanzigmal beide an, fünfmal beide aus, einmal nur das eine. Daraus
+ * wurde r = 0,89 und "sehr deutlich". Es sind zwei Dosen, die nebeneinander
+ * stehen und morgens zusammen genommen werden; der Zusammenhang ist die
+ * Gewohnheit selbst und keine Entdeckung ueber sie.
+ *
+ * Dieselbe Ueberlegung wie bei `genugAbwechslung`, nur auf das Paar statt auf
+ * die einzelne Reihe: gelernt wird aus den Tagen, an denen die beiden
+ * **auseinandergehen**. Davon braucht es ein paar, sonst vergleicht man eine
+ * Spalte mit ihrer Kopie.
+ *
+ * Nur fuer Haken. Bei Zahlen gibt es kein "gleich oder ungleich", und die Last
+ * der letzten Tage ist ein Mittelwert, also ohnehin keine Reihe aus Haken.
+ */
+function genugUneinigkeit(xs: number[], ys: number[]): boolean {
+  if (!istBinaer(xs) || !istBinaer(ys)) return true
+  let anders = 0
+  for (let i = 0; i < xs.length; i++) if (xs[i] !== ys[i]) anders++
+  // Fuenf Tage als Untergrenze, und ein Zehntel als Anteil: wer die Dose ab
+  // und zu vergisst, sammelt ueber ein halbes Jahr sonst genug Ausreisser, um
+  // die Regel zu reissen, obwohl sich an der Sache nichts geaendert hat.
+  return anders >= MIN_VARY && anders >= xs.length / 10
+}
+
 /** Korrelation von x und y, nachdem z aus beiden herausgerechnet wurde. */
 function partial(rxy: number, rxz: number, ryz: number): number | null {
   const den = Math.sqrt((1 - rxz * rxz) * (1 - ryz * ryz))
@@ -472,6 +502,8 @@ function search(feats: Feature[], span: number): Insight[] {
     // Ein Test, der an zwei Punkten haengt, ist kein Test. Er zaehlt deshalb
     // auch nicht fuer die Korrektur — er wird ja nicht durchgefuehrt.
     if (!genugAbwechslung(xs) || !genugAbwechslung(ys)) return
+    // Zwei Haken, die immer zusammen gesetzt werden, vergleichen sich selbst.
+    if (!genugUneinigkeit(xs, ys)) return
     tests++
     const rx = ranks(xs)
     const ry = ranks(ys)
