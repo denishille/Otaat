@@ -89,6 +89,19 @@ export function longDate(iso: string): string {
   return `${WEEKDAYS[d.getDay()]}, ${d.getDate()}. ${MONTHS[d.getMonth()]}`
 }
 
+/**
+ * "Di, 13.10." — fuer die Tagesleiste.
+ *
+ * Kurz, weil daneben die Pfeile und der Weg zurueck in dieselbe Zeile muessen
+ * und auf 390 px sonst nichts mehr passt: das ausgeschriebene "Dienstag, 13.
+ * Oktober" brach dort auf zwei Zeilen um. Der Wochentag bleibt drin, der ist
+ * beim Blaettern die eigentliche Auskunft; das Jahr nicht, das weiss man.
+ */
+export function barDate(iso: string): string {
+  const d = fromISO(iso)
+  return `${WEEKDAYS[d.getDay()].slice(0, 2)}, ${d.getDate()}.${d.getMonth() + 1}.`
+}
+
 export function shortDate(iso: string): string {
   const d = fromISO(iso)
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`

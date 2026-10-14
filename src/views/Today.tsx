@@ -5,7 +5,7 @@ import { CHECK_CATALOG, SCALE_MAX, scaleLabel, type CheckTemplate } from '../dat
 import { activeChecks, carriedDefaults, dropCheck, endKey, ensureSourceChecks, isFilled, scoreDay, streak, timeKey } from '../lib/scoring'
 import { MIN_DAYS, findInsights, loggedDays } from '../lib/insights'
 import { InsightRow, insightKey } from '../components/InsightRow'
-import { addDays, longDate, checkerToday, today } from '../lib/dates'
+import { addDays, barDate, longDate, checkerToday, today } from '../lib/dates'
 import { fetchBrudi } from '../lib/brudi'
 import { applyOuraDays, fetchOura } from '../lib/oura'
 import { BRUDI_HIDDEN_KEYS, BRUDI_MACROS } from '../data/brudi-source'
@@ -402,9 +402,18 @@ export function Today() {
           </div>
           <h1 className="display">{isWallToday ? <>Wie war <em>heute</em>?</> : longDate(date)}</h1>
         </div>
+      </div>
+
+      {/* Die Tagesleiste bleibt beim Scrollen oben stehen. Seit der Wisch die
+          Stelle haelt, landet man beim Blaettern mitten im Raster — und sah
+          dort vorher nirgends, auf welchem Tag man gelandet ist. Sie steht
+          als eigene Zeile und nicht mehr neben der Ueberschrift, weil ein
+          Element nur innerhalb seines Elternteils klebt: in `today-head` waere
+          sie nach dreissig Pixeln mit der Ueberschrift weggescrollt. */}
+      <div className="daybar">
         <div className="datepick">
           <button className="arrowbtn" onClick={() => goDay(-1)} aria-label="Tag zurück"><ChevL /></button>
-          <div className="datepick-label">{isWallToday ? 'Heute' : longDate(date)}</div>
+          <div className="datepick-label">{isWallToday ? 'Heute' : barDate(date)}</div>
           <button className="arrowbtn" disabled={isToday} onClick={() => goDay(1)} aria-label="Tag vor"><ChevR /></button>
           {!isToday && <button className="btn btn--quiet btn--sm" onClick={() => setDate(checkerToday())}>Zurück zu heute</button>}
         </div>

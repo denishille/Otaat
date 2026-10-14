@@ -214,10 +214,29 @@ h2.section-title {
 }
 .daymark--done { color: var(--cobalt); border-color: var(--cobalt-wash); background: var(--cobalt-wash); }
 
+/* Die Tagesleiste haengt sich beim Scrollen unter die Kopfleiste.
+   `--topbar-b` ist deren gemessene Unterkante — auf dem Handy ist sie zwei
+   Zeilen hoch, auf dem Desktop eine, und gerechnet statt gemessen stand die
+   Leiste mal daruntr und mal darueber. Die negativen Seitenraender holen den
+   Hintergrund bis an den Rand des Inhalts, sonst scheinen die Karten links
+   und rechts daneben durch. */
+.daybar {
+  position: sticky; top: var(--topbar-b, 64px); z-index: 30;
+  margin: 0 -24px 28px; padding: 10px 24px;
+  /* Deckend, nicht durchscheinend wie die Kopfleiste: dort liegt oben am
+     Rand wenig, hier schieben sich die Karten mit ihren Skalen durch, und
+     durch Milchglas bleiben zehn Ziffern zehn lesbare Ziffern. */
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
 .datepick { display: flex; align-items: center; gap: 6px; }
+/* Der Weg zurueck steht am anderen Ende, nicht hinter den Pfeilen geklebt. */
+.daybar .datepick > .btn { margin-left: auto; }
 .datepick-label {
   font-family: var(--mono); font-size: 13px; color: var(--ink-2);
-  padding: 0 4px; min-width: 128px; text-align: center;
+  padding: 0 4px; min-width: 96px; text-align: center;
+  white-space: nowrap;
 }
 .arrowbtn {
   width: 30px; height: 30px; border-radius: 50%;
@@ -1430,8 +1449,11 @@ h2.section-title {
   .nav::-webkit-scrollbar { display: none; }
   .nav-item { padding: 6px 9px; font-size: 13px; }
   .topbar-right { gap: 6px; }
-  .today-head { gap: 16px; }
+  .today-head { gap: 16px; margin-bottom: 20px; }
   .today-head > div:last-child { flex-wrap: wrap; }
+  .daybar { margin: 0 -16px 22px; padding: 8px 16px; }
+  /* Auf 390 px muessen Pfeile, Datum und der Weg zurueck in eine Zeile. */
+  .datepick-label { min-width: 0; font-size: 13px; padding: 0 2px; }
   .check-grid { grid-template-columns: 1fr; }
   .scale { grid-template-columns: repeat(10, 1fr); }
   .fm-item { grid-template-columns: auto 1fr; row-gap: 10px; }
