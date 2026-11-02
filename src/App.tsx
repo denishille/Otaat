@@ -4,6 +4,7 @@ import { cloudEnabled } from './lib/supabase'
 import { Today } from './views/Today'
 import { FutureMe } from './views/FutureMe'
 import { Board } from './views/Board'
+import { Trends } from './views/Trends'
 import { Sheet } from './components/Sheet'
 import { Toasts, toast } from './components/Toasts'
 import { Mark, Moon, Sun } from './components/Icons'
@@ -12,12 +13,13 @@ import { confirmedDays } from './lib/scoring'
 import { ouraConnected, ouraConnectUrl, ouraDisconnect } from './lib/oura'
 import { brudiPersonen } from './lib/brudi'
 
-type Tab = 'today' | 'future' | 'board'
+type Tab = 'today' | 'future' | 'board' | 'dash'
 
 const TABS: { id: Tab; label: string; short: string }[] = [
   { id: 'today', label: 'Everything Checker', short: 'Checker' },
   { id: 'future', label: 'Future Me Problems', short: 'Future Me' },
   { id: 'board', label: 'Mind my Business', short: 'Board' },
+  { id: 'dash', label: 'Dashboard', short: 'Dashboard' },
 ]
 
 const routeOf = (): Tab => {
@@ -107,6 +109,7 @@ export default function App() {
         {tab === 'today' && <Today />}
         {tab === 'future' && <FutureMe />}
         {tab === 'board' && <Board />}
+        {tab === 'dash' && <Trends />}
       </main>
 
       {account && <Account onClose={() => setAccount(false)} />}

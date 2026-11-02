@@ -191,5 +191,12 @@ export interface AppState {
      * schon einmal gekostet hat.
      */
     droppedChecks?: ID[]
+    /**
+     * Was das Dashboard zeigt: die Haupt-KPI, was daneben liegt und wie
+     * weit zurueck. Steht in `meta` wie die Boards — ein winziger Eintrag,
+     * der mitsynchronisiert gehoert, damit die Auswahl auf jedem Geraet
+     * dieselbe ist.
+     */
+    dash?: { haupt: string; extra: ID[]; tage: number }
   }
 }
