@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, update, uid, calendarFeedUrl } from '../lib/store'
 import type { Cadence, Reminder } from '../lib/types'
-import { CATALOG, CATALOG_BY_CATEGORY, type Preset } from '../data/catalog'
-import { advance, cadenceLabel, daysBetween, relativeDue, shortDate, today } from '../lib/dates'
-import { XP_REMINDER_DONE } from '../lib/xp'
+import { CATALOG, CATALOG_BY_CATEGORY, CATEGORIES, type Preset } from '../data/catalog'
+import { addDays, addMonths, advance, cadenceLabel, daysBetween, fromISO, longDate, relativeDue, shortDate, toISO, today } from '../lib/dates'
 import { downloadICS } from '../lib/ics'
-import { Cal, Check, Plus, Trash } from '../components/Icons'
+import { Cal, Check, ChevL, ChevR, Pencil, Plus, Trash, X } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
+import { autoFocusUnlessTouch, noAutofill } from '../lib/device'
 import { toast } from '../components/Toasts'
 
 type Filter = { kind: 'radar' } | { kind: 'all' } | { kind: 'cat'; name: string }
@@ -16,6 +16,8 @@ export function FutureMe() {
   const [filter, setFilter] = useState<Filter>({ kind: 'radar' })
   const [picker, setPicker] = useState(false)
   const [cal, setCal] = useState(false)
+  const [dating, setDating] = useState<Reminder | null>(null)
+  const [reset, setReset] = useState(false)
   const [editing, setEditing] = useState<Reminder | 'new' | null>(null)
 
   const rem = state.reminders
@@ -49,9 +51,14 @@ export function FutureMe() {
         const base = daysBetween(item.due, today()) > 0 ? today() : item.due
         item.due = advance(base, item.cadence)
       }
-      d.meta.xp += XP_REMINDER_DONE
     })
-    toast(`„${r.title}" erledigt`, XP_REMINDER_DONE)
+    toast(`„${r.title}" erledigt`)
+  }
+
+  /** Abbestellen: der Eintrag verschwindet, der Katalog bietet ihn wieder an. */
+  function drop(r: Reminder) {
+    update((d) => { d.reminders = d.reminders.filter((x) => x.id !== r.id) })
+    toast(`„${r.title}" abbestellt`)
   }
 
   return (
@@ -64,6 +71,7 @@ export function FutureMe() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn--ghost" onClick={() => setCal(true)} disabled={!rem.length}><Cal /> Kalender</button>
           <button className="btn btn--ghost" onClick={() => setPicker(true)}>Aus dem Regal</button>
+          <button className="btn btn--quiet" onClick={() => setReset(true)} disabled={!rem.length}>Aufräumen</button>
           <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus /> Eigenes</button>
         </div>
       </div>
@@ -118,11 +126,21 @@ export function FutureMe() {
                   {r.done ? (
                     <span className="chip chip--good">erledigt</span>
                   ) : (
-                    <>
-                      <span className={'chip ' + (overdue ? 'chip--warn' : soon ? 'chip--sel' : 'chip--line')}>{relativeDue(r.due, now)}</span>
-                      <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>{shortDate(r.due)}</span>
-                    </>
+                    <button
+                      className={'chip chip--btn ' + (overdue ? 'chip--warn' : soon ? 'chip--sel' : 'chip--line')}
+                      onClick={() => setDating(r)}
+                      title="Termin ändern"
+                    >
+                      {relativeDue(r.due, now)}
+                      <span className="chip-date">{shortDate(r.due)}</span>
+                    </button>
                   )}
+                  <button className="fm-act" onClick={() => setEditing(r)} aria-label="Bearbeiten" title="Bearbeiten">
+                    <Pencil />
+                  </button>
+                  <button className="fm-act fm-act--drop" onClick={() => drop(r)} aria-label="Abbestellen" title="Abbestellen">
+                    <X />
+                  </button>
                 </div>
               </div>
             )
@@ -131,6 +149,13 @@ export function FutureMe() {
       </div>
 
       {cal && <CalendarSheet onClose={() => setCal(false)} />}
+      {dating && <DueSheet reminder={dating} onClose={() => setDating(null)} />}
+      {reset && (
+        <ResetSheet
+          scope={filter.kind === 'cat' ? filter.name : null}
+          onClose={() => setReset(false)}
+        />
+      )}
       {picker && <CatalogPicker onClose={() => setPicker(false)} />}
       {editing && <ReminderEditor reminder={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
@@ -139,18 +164,352 @@ export function FutureMe() {
 
 /* ---------------------------------------------------------------- */
 
+/**
+ * Kategorie waehlen oder neu schreiben.
+ *
+ * Vorher stand hier ein Feld mit `datalist` — Safari auf dem iPhone zeigt die
+ * praktisch nie an, und man sah nicht, welche Kategorien es ueberhaupt gibt.
+ * Diese Liste oeffnet sich beim Antippen, filtert waehrend des Tippens und
+ * bietet unverbrauchte Eingaben ausdruecklich als neue Kategorie an.
+ */
+function CategoryPicker({ value, onChange, options, counts }: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  counts: Record<string, number>
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const boxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    return () => window.removeEventListener('pointerdown', onDown)
+  }, [open])
+
+  const needle = query.trim().toLowerCase()
+  const shown = needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options
+  const isNew = needle.length > 0 && !options.some((o) => o.toLowerCase() === needle)
+
+  const pick = (v: string) => {
+    onChange(v)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div className="catpick" ref={boxRef}>
+      <button
+        id="r-cat"
+        type="button"
+        className={'catpick-field' + (value ? '' : ' catpick-field--empty')}
+        onClick={() => { setOpen((o) => !o); setQuery('') }}
+        aria-expanded={open}
+      >
+        <span>{value || 'Wählen oder neu schreiben'}</span>
+        <ChevR className={'catpick-caret' + (open ? ' catpick-caret--open' : '')} />
+      </button>
+
+      {open && (
+        <div className="catpick-panel">
+          <input
+            className="catpick-search"
+            placeholder="Suchen oder neue Kategorie …"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && needle) { e.preventDefault(); pick(query.trim()) }
+              if (e.key === 'Escape') setOpen(false)
+            }}
+            autoFocus={autoFocusUnlessTouch}
+            {...noAutofill}
+          />
+
+          <div className="catpick-list">
+            {isNew && (
+              <button className="catpick-row catpick-row--new" onClick={() => pick(query.trim())}>
+                <Plus />
+                <span>„{query.trim()}" anlegen</span>
+              </button>
+            )}
+            {shown.map((o) => (
+              <button
+                key={o}
+                className={'catpick-row' + (o === value ? ' catpick-row--on' : '')}
+                onClick={() => pick(o)}
+              >
+                <span className="catpick-name">{o}</span>
+                {counts[o] ? <span className="mono">{counts[o]}</span> : null}
+              </button>
+            ))}
+            {!shown.length && !isNew && (
+              <div className="catpick-empty">Nichts gefunden.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const SHIFTS: { label: string; days?: number; months?: number }[] = [
+  { label: 'morgen', days: 1 },
+  { label: 'in 1 Woche', days: 7 },
+  { label: 'in 1 Monat', months: 1 },
+  { label: 'in 3 Monaten', months: 3 },
+  { label: 'in 6 Monaten', months: 6 },
+  { label: 'in 1 Jahr', months: 12 },
+]
+
+/** Nur der naechste Termin — ohne den Rhythmus anzufassen. */
+function DueSheet({ reminder, onClose }: { reminder: Reminder; onClose: () => void }) {
+  const [due, setDue] = useState(reminder.due)
+
+  const save = (value: string) => {
+    update((d) => {
+      const i = d.reminders.findIndex((x) => x.id === reminder.id)
+      if (i >= 0) d.reminders[i] = { ...d.reminders[i], due: value, done: false }
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet
+      title={reminder.title}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn--ghost" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn--primary" onClick={() => save(due)}>Übernehmen</button>
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor="due-date">Fällig am</label>
+        <input id="due-date" className="input mono" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+      </div>
+
+      <div className="field">
+        <label>Oder schnell verschieben</label>
+        <div className="choice">
+          {SHIFTS.map((sh) => {
+            const target = sh.months ? addMonths(today(), sh.months) : addDays(today(), sh.days ?? 0)
+            return (
+              <button key={sh.label} onClick={() => setDue(target)} aria-pressed={due === target}>
+                {sh.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <p className="chart-note" style={{ margin: 0 }}>
+        Ändert nur den nächsten Termin. Der Rhythmus <b>{cadenceLabel(reminder.cadence)}</b> bleibt
+        und zählt ab hier weiter — den änderst du über den Titel.
+      </p>
+    </Sheet>
+  )
+}
+
+/** Abbestellen in groesseren Portionen. */
+function ResetSheet({ scope, onClose }: { scope: string | null; onClose: () => void }) {
+  const { state } = useStore()
+  const [confirm, setConfirm] = useState<null | 'done' | 'scope' | 'all'>(null)
+
+  const rem = state.reminders
+  const doneCount = rem.filter((r) => r.done).length
+  const scopeCount = scope ? rem.filter((r) => r.category === scope).length : 0
+
+  const run = (what: 'done' | 'scope' | 'all') => {
+    update((d) => {
+      if (what === 'done') d.reminders = d.reminders.filter((r) => !r.done)
+      else if (what === 'scope') d.reminders = d.reminders.filter((r) => r.category !== scope)
+      else d.reminders = []
+    })
+    toast(what === 'all' ? 'Future Me Problems geleert' : 'Abbestellt')
+    onClose()
+  }
+
+  const Row = ({ id, title, sub, n }: { id: 'done' | 'scope' | 'all'; title: string; sub: string; n: number }) => (
+    <div className="reset-row">
+      <div>
+        <div className="fm-title">{title}</div>
+        <div className="fm-meta"><span>{sub}</span></div>
+      </div>
+      {confirm === id ? (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn--quiet btn--sm" onClick={() => setConfirm(null)}>Abbrechen</button>
+          <button className="btn btn--primary btn--sm" onClick={() => run(id)}>Wirklich</button>
+        </div>
+      ) : (
+        <button className="btn btn--ghost btn--sm btn--danger" disabled={n === 0} onClick={() => setConfirm(id)}>
+          {n} entfernen
+        </button>
+      )}
+    </div>
+  )
+
+  return (
+    <Sheet
+      title="Aufräumen"
+      onClose={onClose}
+      footer={<button className="btn btn--primary" onClick={onClose}>Fertig</button>}
+    >
+      <Row id="done" title="Erledigte" sub="Einmalige Sachen, die durch sind" n={doneCount} />
+      {scope && (
+        <Row id="scope" title={scope} sub="Alles aus dieser Kategorie" n={scopeCount} />
+      )}
+      <Row id="all" title="Alles" sub="Die Liste ist danach leer" n={rem.length} />
+      <p className="chart-note" style={{ margin: 0 }}>
+        Abbestellte Einträge stehen im Regal wieder zur Auswahl. Erfasste Termine aus
+        dem Everything Checker sind davon nicht betroffen.
+      </p>
+    </Sheet>
+  )
+}
+
+/**
+ * Alle Termine eines Eintrags zwischen `from` und `to`.
+ *
+ * `due` ist nur der naechste. Fuer einen Monatsueberblick muss der Rhythmus
+ * weitergerechnet werden — eine woechentliche Sache steht vier Mal im Monat.
+ * Der Zaehler ist eine Bremse gegen kaputte Rhythmen, nicht Teil der Logik.
+ */
+function occurrences(r: Reminder, from: string, to: string): string[] {
+  if (r.done) return []
+  if (r.cadence.type === 'once') return r.due >= from && r.due <= to ? [r.due] : []
+  const out: string[] = []
+  let d = r.due
+  let guard = 0
+  while (d < from && guard++ < 500) d = advance(d, r.cadence)
+  while (d <= to && guard++ < 500) {
+    out.push(d)
+    d = advance(d, r.cadence)
+  }
+  return out
+}
+
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
+  'August', 'September', 'Oktober', 'November', 'Dezember']
+
+/** Monatsraster, montags beginnend. Fuehrende und nachlaufende Tage bleiben leer. */
+function monthGrid(anchor: string): (string | null)[] {
+  const d = fromISO(anchor)
+  const first = new Date(d.getFullYear(), d.getMonth(), 1)
+  const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  const lead = (first.getDay() + 6) % 7
+  const cells: (string | null)[] = Array.from({ length: lead }, () => null)
+  for (let i = 1; i <= days; i++) cells.push(toISO(new Date(d.getFullYear(), d.getMonth(), i)))
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
 function CalendarSheet({ onClose }: { onClose: () => void }) {
   const { state, userId } = useStore()
   const [url, setUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const now = today()
+  const [anchor, setAnchor] = useState(now)
+  const [pick, setPick] = useState<string | null>(now)
 
   useEffect(() => { void calendarFeedUrl().then(setUrl) }, [userId])
 
   const webcal = url?.replace(/^https?:/, 'webcal:')
 
+  const cells = useMemo(() => monthGrid(anchor), [anchor])
+  const span = useMemo(() => {
+    const real = cells.filter((c): c is string => c !== null)
+    return { from: real[0], to: real[real.length - 1] }
+  }, [cells])
+
+  /** Tag -> die Eintraege, die an dem Tag anstehen. */
+  const byDay = useMemo(() => {
+    const map = new Map<string, Reminder[]>()
+    for (const r of state.reminders) {
+      for (const d of occurrences(r, span.from, span.to)) {
+        const list = map.get(d)
+        if (list) list.push(r)
+        else map.set(d, [r])
+      }
+    }
+    return map
+  }, [state.reminders, span])
+
+  const month = fromISO(anchor)
+  const shift = (n: number) => {
+    const next = addMonths(`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-01`, n)
+    setAnchor(next)
+    setPick(null)
+  }
+
+  const shown = pick ? byDay.get(pick) ?? [] : []
+
   return (
-    <Sheet title="In den Kalender" onClose={onClose}
+    <Sheet title="Kalender" wide onClose={onClose}
       footer={<button className="btn btn--primary" onClick={onClose}>Schließen</button>}>
+
+      <div className="cal">
+        <div className="cal-head">
+          <button className="arrowbtn" onClick={() => shift(-1)} aria-label="Monat zurück"><ChevL /></button>
+          <div className="cal-month">{MONTHS[month.getMonth()]} {month.getFullYear()}</div>
+          <button className="arrowbtn" onClick={() => shift(1)} aria-label="Monat vor"><ChevR /></button>
+          {anchor.slice(0, 7) !== now.slice(0, 7) && (
+            <button className="btn btn--quiet btn--sm" onClick={() => { setAnchor(now); setPick(now) }}>Heute</button>
+          )}
+        </div>
+
+        <div className="cal-grid">
+          {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => (
+            <div className="cal-wd" key={w}>{w}</div>
+          ))}
+          {cells.map((d, i) => {
+            if (!d) return <div className="cal-cell cal-cell--out" key={`x${i}`} />
+            const list = byDay.get(d) ?? []
+            const late = d < now && list.length > 0
+            return (
+              <button
+                key={d}
+                className={'cal-cell'
+                  + (d === now ? ' cal-cell--today' : '')
+                  + (d === pick ? ' cal-cell--sel' : '')
+                  + (list.length ? ' cal-cell--has' : '')}
+                onClick={() => setPick(d === pick ? null : d)}
+              >
+                <span className="cal-n">{fromISO(d).getDate()}</span>
+                <span className="cal-dots">
+                  {list.slice(0, 3).map((r, k) => (
+                    <i className={'cal-dot' + (late ? ' cal-dot--late' : '')} key={r.id + k} />
+                  ))}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="cal-list">
+          {!pick ? (
+            <span className="cal-empty">Tag antippen.</span>
+          ) : shown.length === 0 ? (
+            <span className="cal-empty">{longDate(pick)} — nichts.</span>
+          ) : (
+            <>
+              <div className="cal-list-head">{longDate(pick)}</div>
+              {shown.map((r) => (
+                <div className="cal-item" key={r.id}>
+                  <span className="cal-item-title">{r.title}</span>
+                  <span className="cal-item-meta">{r.category} · {cadenceLabel(r.cadence)}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      <hr className="divider" />
 
       <div className="field">
         <label>Einmalig exportieren</label>
@@ -213,9 +572,15 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
     })).filter((g) => g.items.length)
   }, [q])
 
-  function add(p: Preset) {
-    update((d) => { d.reminders.push(fromPreset(p)) })
-    toast(`„${p.title}" übernommen`)
+  /** Ein Tipp uebernimmt, der naechste bestellt wieder ab. */
+  function toggle(p: Preset) {
+    if (taken.has(p.id)) {
+      update((d) => { d.reminders = d.reminders.filter((r) => r.presetId !== p.id) })
+      toast(`„${p.title}" abbestellt`)
+    } else {
+      update((d) => { d.reminders.push(fromPreset(p)) })
+      toast(`„${p.title}" übernommen`)
+    }
   }
 
   function addAll(items: Preset[]) {
@@ -233,28 +598,38 @@ function CatalogPicker({ onClose }: { onClose: () => void }) {
       footer={
         <>
           <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>
-            {CATALOG.length} Einträge · Termine kannst du danach einzeln verschieben
+            {CATALOG.length} Einträge · nochmal tippen bestellt wieder ab
           </span>
           <button className="btn btn--primary" onClick={onClose}>Fertig</button>
         </>
       }
     >
-      <input className="input" placeholder="Suchen — Zahnarzt, TÜV, Semesterbeitrag …" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      <input
+        className="input" type="search"
+        placeholder="Suchen — Zahnarzt, TÜV, Semesterbeitrag …"
+        value={q} onChange={(e) => setQ(e.target.value)}
+        autoFocus={autoFocusUnlessTouch} {...noAutofill}
+      />
 
       {groups.map((g) => (
         <section key={g.category}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
-            <h4 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 19 }}>{g.category}</h4>
+            <h4 style={{ margin: 0, fontFamily: 'var(--display)', fontWeight: 400, fontSize: 19 }}>{g.category}</h4>
             <button className="btn btn--quiet btn--sm" onClick={() => addAll(g.items)}>alle</button>
           </div>
           <div className="cat-grid">
             {g.items.map((p) => (
-              <button key={p.id} className={'cat-row' + (taken.has(p.id) ? ' cat-row--added' : '')} onClick={() => add(p)}>
+              <button
+                key={p.id}
+                className={'cat-row' + (taken.has(p.id) ? ' cat-row--added' : '')}
+                onClick={() => toggle(p)}
+                title={taken.has(p.id) ? 'Abbestellen' : 'Übernehmen'}
+              >
                 <div style={{ minWidth: 0 }}>
                   <div className="cat-row-title">{p.title}</div>
                   <div className="cat-row-sub">{cadenceLabel(p.cadence)}{p.note ? ` · ${p.note}` : ''}</div>
                 </div>
-                <span className="cat-plus">{taken.has(p.id) ? '✓' : '+'}</span>
+                <span className="cat-plus">{taken.has(p.id) ? <Check /> : '+'}</span>
               </button>
             ))}
           </div>
@@ -300,10 +675,20 @@ const UNITS: { u: 'day' | 'week' | 'month' | 'year'; label: string }[] = [
 
 function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onClose: () => void }) {
   const { state } = useStore()
-  const existing = [...new Set([...state.reminders.map((r) => r.category), 'Sonstiges'])].sort((a, b) => a.localeCompare(b, 'de'))
+  // Erst die Kategorien des Regals in ihrer Reihenfolge — die ist nach
+  // Lebensbereichen sortiert, nicht alphabetisch —, dann alles, was nur in
+  // eigenen Eintraegen vorkommt.
+  const mine = new Set(state.reminders.map((r) => r.category))
+  const known: string[] = [...CATEGORIES]
+  const extra = [...mine].filter((c) => !known.includes(c)).sort((a, b) => a.localeCompare(b, 'de'))
+  const allCategories = [...known, ...extra, 'Sonstiges'].filter((c, i, a) => a.indexOf(c) === i)
+  const counts = state.reminders.reduce<Record<string, number>>((acc, r) => {
+    acc[r.category] = (acc[r.category] ?? 0) + 1
+    return acc
+  }, {})
 
   const [title, setTitle] = useState(reminder?.title ?? '')
-  const [category, setCategory] = useState(reminder?.category ?? existing[0] ?? 'Sonstiges')
+  const [category, setCategory] = useState(reminder?.category ?? '')
   const [repeats, setRepeats] = useState(reminder ? reminder.cadence.type === 'every' : true)
   const [n, setN] = useState(reminder?.cadence.type === 'every' ? String(reminder.cadence.n) : '1')
   const [unit, setUnit] = useState<'day' | 'week' | 'month' | 'year'>(reminder?.cadence.type === 'every' ? reminder.cadence.unit : 'year')
@@ -313,16 +698,17 @@ function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onCl
 
   const save = () => {
     if (!title.trim()) return
+    const cat = category.trim() || 'Sonstiges'
     const cadence: Cadence = repeats
       ? { type: 'every', n: Math.max(1, Number(n) || 1), unit }
       : { type: 'once', on: due }
     update((d) => {
       if (reminder) {
         const i = d.reminders.findIndex((r) => r.id === reminder.id)
-        if (i >= 0) d.reminders[i] = { ...d.reminders[i], title: title.trim(), category, cadence, due, lead: Number(lead) || 0, notes: notes.trim() || undefined, done: repeats ? false : d.reminders[i].done }
+        if (i >= 0) d.reminders[i] = { ...d.reminders[i], title: title.trim(), category: cat, cadence, due, lead: Number(lead) || 0, notes: notes.trim() || undefined, done: repeats ? false : d.reminders[i].done }
       } else {
         d.reminders.push({
-          id: uid(), title: title.trim(), category, cadence, due,
+          id: uid(), title: title.trim(), category: cat, cadence, due,
           lead: Number(lead) || 0, notes: notes.trim() || undefined,
           createdAt: new Date().toISOString(),
         })
@@ -351,13 +737,22 @@ function ReminderEditor({ reminder, onClose }: { reminder: Reminder | null; onCl
     >
       <div className="field">
         <label htmlFor="r-title">Was</label>
-        <input id="r-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="z.B. Semesterbeitrag überweisen" autoFocus />
+        <input
+          id="r-title" name="reminder-title" className="input"
+          value={title} onChange={(e) => setTitle(e.target.value)}
+          placeholder="z.B. Semesterbeitrag überweisen"
+          autoFocus={autoFocusUnlessTouch} {...noAutofill}
+        />
       </div>
 
       <div className="field">
         <label htmlFor="r-cat">Kategorie</label>
-        <input id="r-cat" className="input" list="r-cats" value={category} onChange={(e) => setCategory(e.target.value)} />
-        <datalist id="r-cats">{existing.map((c) => <option key={c} value={c} />)}</datalist>
+        <CategoryPicker
+          value={category}
+          onChange={setCategory}
+          options={allCategories}
+          counts={counts}
+        />
       </div>
 
       <div className="field">

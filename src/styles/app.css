@@ -6,6 +6,12 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
+  /* Kein Doppeltipp-Zoom, kein Gummiband — die App soll sich wie eine App
+     anfuehlen, nicht wie eine Seite. Der Zoom auf dem Board ist davon nicht
+     betroffen, der laeuft ueber eigene Transformationen. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--sans);
@@ -37,16 +43,14 @@ a { color: var(--cobalt); text-decoration: none; }
 }
 
 .brand {
-  display: flex; align-items: baseline; gap: 9px;
-  font-family: var(--serif); font-size: 25px; letter-spacing: -.01em;
-  user-select: none;
+  display: flex; align-items: center; gap: 10px;
+  user-select: none; cursor: pointer; min-width: 0;
 }
-.brand-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--cobalt); align-self: center;
-  transition: transform .5s cubic-bezier(.2,.9,.2,1);
+.brand-mark {
+  font-size: 25px; color: var(--ink-2); flex-shrink: 0;
+  transition: transform .6s cubic-bezier(.2,.9,.2,1);
 }
-.brand:hover .brand-dot { transform: translateY(-3px) scale(1.25); }
+.brand:hover .brand-mark { transform: rotate(45deg); }
 
 .nav { display: flex; gap: 2px; margin-left: 8px; min-width: 0; }
 .nav-short { display: none; }
@@ -66,6 +70,20 @@ a { color: var(--cobalt); text-decoration: none; }
 
 /* ============================ Typo ============================ */
 
+/* Der Name ausgeschrieben, in einer Farbe. Die Anfangsbuchstaben stehen
+   groesser und schwerer — so springt OTAAT ueber die Form heraus statt ueber
+   einen zweiten Farbton. Steht in der Kopfleiste, also auf jeder Seite. */
+.wordmark {
+  font-family: var(--display); color: var(--ink);
+  font-size: 12px; font-weight: 400;
+  letter-spacing: .15em; text-transform: uppercase;
+  line-height: 1; white-space: nowrap;
+}
+.wordmark i {
+  font-style: normal; font-weight: 700;
+  font-size: 18px; letter-spacing: .03em;
+}
+
 .eyebrow {
   font-size: 11px; font-weight: 600; letter-spacing: .13em;
   text-transform: uppercase; color: var(--ink-3);
@@ -73,15 +91,16 @@ a { color: var(--cobalt); text-decoration: none; }
 }
 
 .display {
-  font-family: var(--serif); font-weight: 400;
-  font-size: clamp(34px, 5.2vw, 54px); line-height: 1.04;
-  letter-spacing: -.02em; margin: 10px 0 0;
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(31px, 4.6vw, 47px); line-height: 1.06;
+  letter-spacing: -.028em; margin: 10px 0 0;
+  text-wrap: balance;
 }
-.display em { font-style: italic; color: var(--cobalt); }
+.display em { font-style: normal; font-weight: 700; color: var(--cobalt); }
 
 h2.section-title {
-  font-family: var(--serif); font-weight: 400; font-size: 27px;
-  letter-spacing: -.01em; margin: 0;
+  font-family: var(--display); font-weight: 600; font-size: 24px;
+  letter-spacing: -.02em; margin: 0;
 }
 
 .lede { color: var(--ink-2); font-size: 16px; max-width: 58ch; margin: 12px 0 0; }
@@ -152,20 +171,15 @@ h2.section-title {
   text-align: center; padding: 56px 24px; color: var(--ink-3);
   border: 1px dashed var(--line-strong); border-radius: var(--r-lg);
 }
-.empty strong { display: block; color: var(--ink); font-family: var(--serif); font-size: 20px; font-weight: 400; margin-bottom: 6px; }
+.empty strong { display: block; color: var(--ink); font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -.015em; margin-bottom: 6px; }
 
-/* ============================ XP / Level ============================ */
+/* ============================ Fortschritt ============================ */
 
-.xp { display: flex; align-items: center; gap: 10px; }
-.xp-level {
-  font-family: var(--mono); font-size: 11px; font-weight: 500;
-  color: var(--ink-3); white-space: nowrap;
-}
-.xp-track {
+.meter {
   width: 92px; height: 5px; border-radius: 3px;
   background: var(--paper-sunk); overflow: hidden;
 }
-.xp-fill {
+.meter-fill {
   height: 100%; background: var(--cobalt); border-radius: 3px;
   transition: width .7s cubic-bezier(.2,.9,.2,1);
 }
@@ -184,10 +198,45 @@ h2.section-title {
   gap: 24px; flex-wrap: wrap; margin-bottom: 32px;
 }
 
+/* Der Vermerk oben am Tag: Haken heisst festgeschrieben, offener Ring heisst
+   noch nicht. Beides in derselben Zeile wie die Rubrikzeile, damit der Blick
+   es mitnimmt, ohne dass das Blatt eine weitere Ebene bekommt. */
+.eyebrow--row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.daymark {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); color: var(--ink-3);
+  font-size: 10.5px; text-transform: none; letter-spacing: .04em;
+}
+.daymark-ring {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.daymark--done { color: var(--cobalt); border-color: var(--cobalt-wash); background: var(--cobalt-wash); }
+
+/* Die Tagesleiste haengt sich beim Scrollen unter die Kopfleiste.
+   `--topbar-b` ist deren gemessene Unterkante — auf dem Handy ist sie zwei
+   Zeilen hoch, auf dem Desktop eine, und gerechnet statt gemessen stand die
+   Leiste mal daruntr und mal darueber. Die negativen Seitenraender holen den
+   Hintergrund bis an den Rand des Inhalts, sonst scheinen die Karten links
+   und rechts daneben durch. */
+.daybar {
+  position: sticky; top: var(--topbar-b, 64px); z-index: 30;
+  margin: 0 -24px 28px; padding: 10px 24px;
+  /* Deckend, nicht durchscheinend wie die Kopfleiste: dort liegt oben am
+     Rand wenig, hier schieben sich die Karten mit ihren Skalen durch, und
+     durch Milchglas bleiben zehn Ziffern zehn lesbare Ziffern. */
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
 .datepick { display: flex; align-items: center; gap: 6px; }
+/* Der Weg zurueck steht am anderen Ende, nicht hinter den Pfeilen geklebt. */
+.daybar .datepick > .btn { margin-left: auto; }
 .datepick-label {
   font-family: var(--mono); font-size: 13px; color: var(--ink-2);
-  padding: 0 4px; min-width: 128px; text-align: center;
+  padding: 0 4px; min-width: 96px; text-align: center;
+  white-space: nowrap;
 }
 .arrowbtn {
   width: 30px; height: 30px; border-radius: 50%;
@@ -197,6 +246,65 @@ h2.section-title {
 }
 .arrowbtn:hover:not([disabled]) { color: var(--ink); border-color: var(--ink-3); }
 .arrowbtn[disabled] { opacity: .3; pointer-events: none; }
+
+/* Kopfzeile des Rasters: links wie viele, rechts der Weg zum Ordnen.
+   Die Haarlinie haelt beides an der Liste fest. */
+.grid-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: -14px 0 14px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+.grid-head-k {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-4);
+}
+.grid-head .btn { gap: 7px; margin-right: -9px; }
+
+/* Sortier-Blatt: oben die Handgriffe, darunter die Liste zum Verschieben. */
+.sortquick { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.sortlist {
+  display: flex; flex-direction: column; gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+  margin: 0; padding: 0; list-style: none;
+  /* Am Griff gehoert der Zug uns; ausserhalb soll das Blatt weiter scrollen. */
+  touch-action: pan-y;
+}
+.sortlist .sortrow-grip { touch-action: none; }
+.sortrow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px 7px 14px; background: var(--surface);
+  transition: background .3s;
+}
+.sortrow-n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
+  width: 1.6em; flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+.sortrow-name { font-size: 14.5px; font-weight: 550; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortrow-art {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
+}
+/* Griff und Papierkorb brauchen Platz zum Treffen, nicht nur zum Sehen. */
+.sortrow-grip { flex-shrink: 0; width: 38px; height: 38px; }
+.sortrow-weg { flex-shrink: 0; width: 34px; height: 34px; }
+/* Was rausfliegt, bleibt sichtbar stehen, bis das Blatt zugeht — sonst
+   weiss man nach dem dritten Tipp nicht mehr, was man gerade wegwirft. */
+.sortrow--raus .sortrow-name { text-decoration: line-through; color: var(--ink-4); }
+.sortrow--raus .sortrow-n,
+.sortrow--raus .sortrow-art,
+.sortrow--raus .sortrow-grip { opacity: .35; }
+.sortrow--raus .sortrow-weg { color: var(--signal); }
+/* Die gefasste Zeile hebt sich ab, damit man sie beim Ziehen nicht verliert. */
+.sortrow--dragging {
+  background: var(--cobalt-wash); transition: none;
+  box-shadow: var(--shadow-2); position: relative; z-index: 1;
+}
+
+@media (max-width: 520px) {
+  .sortrow-art { display: none; }
+}
 
 .check-grid {
   display: grid; gap: 12px;
@@ -213,7 +321,11 @@ h2.section-title {
   transition: border-color .18s, box-shadow .18s, transform .18s;
   display: flex; flex-direction: column; gap: 13px;
   min-height: 118px;
+  /* Die ganze Kachel oeffnet die Statistik; die Eingaben behalten ihren
+     eigenen Zeiger. */
+  cursor: pointer;
 }
+.check input, .check textarea { cursor: auto; }
 .check:hover { box-shadow: var(--shadow-2); }
 .check--filled { border-color: var(--line-strong); }
 .check--filled::before {
@@ -238,15 +350,49 @@ h2.section-title {
 .bool button.yes[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 
 /* Scale 1-5 */
-.scale { display: flex; gap: 6px; }
+/* Zehn Stufen. Das Quadrat von frueher geht nicht mehr auf — bei zehn Tasten
+   waere es 28 px hoch und damit kein Ziel mehr, das man auf dem Handy trifft.
+   Also feste Hoehe.
+   Raster statt Umbruch: eine umbrechende Reihe laesst die uebrig gebliebenen
+   Tasten die letzte Zeile ausfuellen, und dann ist die 10 dreimal so breit
+   wie die 3. Zwei mal fuenf ist der Normalfall (die Karten sind mindestens
+   258 px breit, zehn nebeneinander waeren dort 18 px); auf dem Handy, wo die
+   Karte ueber die ganze Breite geht, passen alle zehn in eine Reihe. */
+.scale {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+  /* Senkrecht soll die Seite weiter scrollen, waagerecht gehoert die Geste
+     der Skala. Ohne das faengt der Browser den Zug ab, bevor er ankommt. */
+  touch-action: pan-y;
+}
 .scale button {
-  flex: 1; aspect-ratio: 1/1; max-height: 40px; border-radius: var(--r-md);
+  min-width: 0; height: 40px; border-radius: var(--r-md);
   border: 1px solid var(--line-strong);
-  font-family: var(--mono); font-size: 13px; color: var(--ink-3);
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-3);
   transition: all .13s;
 }
+.scale button { pointer-events: none; }
 .scale button:hover { border-color: var(--ink-3); color: var(--ink); transform: translateY(-2px); }
 .scale button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+
+/* Dauer: zwei Felder mit Einheit dahinter. Kein Plus/Minus — bei Minuten
+   waere die Schrittweite entweder zu grob oder man tippt ewig. */
+.duration {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface); padding: 0 13px 0 0; height: 44px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.duration:focus-within { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash); }
+.duration input {
+  flex: 1 1 0; min-width: 0; height: 100%; padding: 0 0 0 13px;
+  background: none; border: 0; outline: none; color: var(--ink);
+  font-family: var(--mono); font-size: 19px; letter-spacing: .01em;
+  font-variant-numeric: tabular-nums;
+}
+.duration span {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0;
+}
 
 /* Number stepper */
 .stepper { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -269,6 +415,28 @@ h2.section-title {
 .stepper button:hover { border-color: var(--ink-3); color: var(--ink); }
 
 /* Choice */
+/* Die Uhrzeit neben der Zahl — Schlaf hat beides. */
+/* Zwei Zeitfelder als Spanne. Auf dem Handy nebeneinander, sonst frisst die
+   Schlafkarte die halbe Seite. */
+.timespan { display: flex; gap: 8px; }
+.timespan .timefield { flex: 1 1 0; min-width: 0; gap: 7px; }
+
+.timefield {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-4);
+}
+.timefield input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 11px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink);
+  font-family: var(--mono); font-size: 14px; text-transform: none;
+  letter-spacing: 0; outline: none;
+}
+.timefield input:focus { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash); }
+/* Safari setzt bei leerem `time` sonst einen grauen Platzhalter in Systemfarbe. */
+.timefield input::-webkit-date-and-time-value { text-align: left; }
+
 .choice { display: flex; flex-wrap: wrap; gap: 6px; }
 .choice button {
   padding: 6px 11px; border-radius: var(--r-pill);
@@ -277,6 +445,195 @@ h2.section-title {
 }
 .choice button:hover { border-color: var(--ink-3); color: var(--ink); }
 .choice button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+
+/* Statistik einer Kategorie */
+/* Flex statt Grid: die Kacheln der letzten Zeile ziehen sich auf die volle
+   Breite. Ein Raster liesse je nach Anzahl eine graue Luecke stehen. */
+.stat-row {
+  display: flex; flex-wrap: wrap;
+  gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.stat-tile { flex: 1 1 104px; background: var(--surface); padding: 13px 15px; }
+.stat-tile-v {
+  font-family: var(--display); font-weight: 600; font-size: 23px;
+  letter-spacing: -.02em; margin-top: 2px;
+}
+.stat-tile-v small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.stat-tile-note { margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
+
+.chart-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.chart-head h4 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px;
+  letter-spacing: -.015em;
+}
+.chart-note { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+
+.chart { display: flex; flex-direction: column; gap: 8px; }
+.chart-plot {
+  position: relative;
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 120px; padding: 0 2px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.chart-plot--wide { gap: 10px; height: 130px; }
+
+/* Ein Balken je Tag: schmal, mit abgerundetem Kopf, auf der Grundlinie sitzend. */
+.chart-bar {
+  flex: 1; min-width: 3px;
+  background: var(--cobalt);
+  border-radius: 4px 4px 0 0;
+  transition: opacity .12s;
+}
+.chart-bar:hover { opacity: .7; }
+.chart-bar--empty { background: var(--line-strong); border-radius: 2px; }
+/* Der gegriffene Tag: Tinte statt Kobalt, damit er sich aus der Reihe loest,
+   ohne eine zweite Bedeutung einzufuehren. */
+.chart-bar--pick { background: var(--ink); }
+/* Gegriffen wird auf der ganzen Flaeche. Senkrecht darf die Seite weiter
+   scrollen, waagerecht faehrt der Finger den Verlauf ab. */
+.chart-plot--pick { touch-action: pan-y; cursor: crosshair; }
+
+.chart-legend { display: flex; gap: 10px; }
+.chart-legend span {
+  flex: 1; display: flex; flex-direction: column; gap: 1px;
+  text-align: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+}
+.chart-legend b { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+
+.chart-axis {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  min-height: 15px;
+}
+.chart-pick { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.chart-pick b {
+  font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink);
+}
+.chart-pick > span:first-of-type { font-size: 11.5px; color: var(--ink-2); }
+/* Der Knopf zum Verwerfen steht in derselben Zeile wie der gegriffene Tag —
+   er gehoert zu dem Wert, der daneben steht, nicht zum Diagramm. */
+.chart-pick .btn { margin-left: auto; padding: 3px 10px; }
+
+/* Reihenfolge aendern */
+.grip {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; margin: -3px -5px -3px 0;
+  color: var(--ink-4); font-size: 15px;
+  border-radius: 6px;
+  cursor: grab;
+  /* Der Browser darf den Griff nicht zum Scrollen benutzen. */
+  touch-action: none;
+}
+.grip:hover { color: var(--ink-2); background: var(--paper-sunk); }
+.grip:active { cursor: grabbing; }
+
+.check--moving {
+  opacity: .35;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.drag-ghost {
+  position: fixed; z-index: 70;
+  transform: translate(-50%, -160%);
+  padding: 8px 15px; border-radius: var(--r-pill);
+  background: var(--ink); color: var(--paper);
+  font-size: 13.5px; font-weight: 600;
+  box-shadow: var(--shadow-3);
+  pointer-events: none; white-space: nowrap;
+}
+
+/* Gelesene Rubrik: zeigt an, statt abzufragen. */
+.ext { display: flex; flex-direction: column; gap: 7px; }
+.ext-row { display: flex; align-items: baseline; gap: 6px; }
+.ext-value {
+  font-family: var(--display); font-weight: 600; font-size: 31px;
+  letter-spacing: -.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ext-target { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+/* Die Makros unter den Kalorien. Eine Zeile, keine Kacheln — sie erlaeutern
+   die Zahl darueber und sollen ihr nicht den Rang ablaufen. */
+.ext-macros {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+.ext-macros b {
+  font-family: var(--mono); font-weight: 600; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.ext-note {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+.ext--empty {
+  font-size: 13px; color: var(--ink-3);
+  padding: 10px 0;
+}
+
+/* Mehrfachauswahl */
+/* Alles in dieser Reihe ist gleich hoch — die Optionen und die beiden
+   Knoepfe dahinter. 40 Pixel, weil das hier mit dem Daumen bedient wird. */
+.multi { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.multi button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 15px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong); font-size: 13.5px; font-weight: 500;
+  color: var(--ink-3); transition: all .13s;
+}
+.multi button:hover { border-color: var(--ink-3); color: var(--ink); }
+.multi button[aria-pressed='true'] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.multi button.none[aria-pressed='true'] { background: var(--ink-3); border-color: var(--ink-3); }
+.multi .addopt {
+  width: 40px; padding: 0; font-size: 17px;
+  border-style: dashed; color: var(--ink-4);
+}
+.multi .addopt:hover { color: var(--cobalt); border-color: var(--cobalt); }
+/* Das Plus legt an, der Stift raeumt auf — zwei gleich aussehende
+   gestrichelte Kreise waren nicht auseinanderzuhalten. */
+.multi .editopt {
+  width: 40px; padding: 0; font-size: 16px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill);
+  background: var(--paper-sunk); color: var(--ink-3);
+}
+.multi .editopt:hover { color: var(--ink); border-color: var(--ink-3); }
+.multi .editopt--on {
+  background: var(--ink); border-color: var(--ink); color: var(--paper);
+}
+.multi .editopt--on:hover { color: var(--paper); border-color: var(--ink); }
+
+/* Im Bearbeiten-Modus haengt an jeder Option ein x. Die Option selbst laesst
+   sich dann nicht schalten — sonst trifft man beim Zielen daneben. */
+.multi-slot { position: relative; display: inline-flex; }
+.multi--managing .multi-slot > button:not(.multi-x) { opacity: .7; }
+.multi--managing .multi-slot > button[disabled] { pointer-events: none; }
+
+/* `.multi .multi-x` statt `.multi-x`: sonst gewinnt `.multi button` mit
+   seiner hoeheren Spezifitaet und der Kreis bleibt ein Oval. */
+.multi .multi-x {
+  position: absolute; top: -5px; right: -5px;
+  /* Padding und Rahmen der Options-Chips zuruecknehmen, sonst wird aus dem
+     Kreis ein Oval. */
+  width: 20px; height: 20px; min-width: 0; min-height: 0; padding: 0; border: 0;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--signal); color: #fff;
+  font-size: 11px; line-height: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+  transition: transform .12s;
+}
+.multi .multi-x:hover { transform: scale(1.15); }
+.multi input {
+  width: 128px; height: 40px; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--cobalt); background: var(--surface);
+  font-size: 13.5px; outline: none;
+}
 
 /* Text */
 .check .textarea { min-height: 62px; font-size: 13.5px; }
@@ -296,20 +653,103 @@ h2.section-title {
 
 /* Day summary */
 .daysum {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  /* Zwei Spalten, immer nebeneinander — auch auf dem Handy. */
+  display: grid; grid-template-columns: 1fr 1fr;
+  width: fit-content; max-width: 100%; min-width: min(300px, 100%);
   gap: 1px; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-lg);
   overflow: hidden; margin-bottom: 28px;
 }
 .daysum-cell { background: var(--surface); padding: 16px 18px; }
 .daysum-k { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); }
-.daysum-v { font-family: var(--serif); font-size: 29px; line-height: 1.15; margin-top: 3px; }
+.daysum-v { font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: -.02em; line-height: 1.15; margin-top: 3px; }
 .daysum-v small { font-family: var(--sans); font-size: 13px; color: var(--ink-3); font-weight: 500; }
 
-/* Trend strip */
-.trend { display: flex; gap: 3px; align-items: flex-end; height: 34px; margin-top: 8px; }
-.trend-bar { flex: 1; background: var(--cobalt-wash); border-radius: 2px; min-height: 4px; transition: height .4s; }
-.trend-bar--full { background: var(--cobalt); }
+/* Tagesabschluss */
+.confirm {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin-top: 20px; padding: 16px 20px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.confirm-text { flex: 1 1 260px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.confirm-text b { color: var(--ink); font-weight: 600; }
+.confirm .btn--primary { flex-shrink: 0; }
+
+.confirm--done {
+  border-style: dashed; border-color: var(--good);
+  background: var(--good-wash); box-shadow: none;
+}
+.confirm--done .confirm-text b { color: var(--good); }
+
+/* Zusammenhaenge */
+.insights { margin-bottom: 28px; }
+
+.insights-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.insights-note { font-size: 12.5px; color: var(--ink-3); }
+
+.insight {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px;
+  padding: 13px 18px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.insight + .insight { margin-top: 8px; }
+
+/* Zweite Reihe: sieht so aus, haelt der Korrektur fuer Mehrfachvergleiche
+   aber noch nicht stand. Deshalb blasser und ohne Schatten. */
+.insights-sub {
+  margin: 20px 0 10px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+.insight--weak {
+  background: transparent; box-shadow: none;
+  border-style: dashed;
+}
+.insight--weak .insight-text { color: var(--ink-2); }
+.insight--weak + .insight--weak { margin-top: 6px; }
+.insight-text { font-size: 14px; line-height: 1.45; }
+.insight-text b { font-weight: 650; }
+.insight-meta {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Staerke als Balken, Richtung als Farbe */
+.insight-bar { width: 52px; height: 5px; border-radius: 3px; background: var(--paper-sunk); overflow: hidden; }
+.insight-bar i { display: block; height: 100%; border-radius: 3px; }
+.insight-bar--up i { background: var(--cobalt); }
+.insight-bar--down i { background: var(--signal); }
+
+.insights-progress {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 15px 18px; border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md); color: var(--ink-2); font-size: 13.5px;
+  line-height: 1.5;
+}
+.insights-progress > span:first-child { flex: 1 1 260px; min-width: 0; }
+.insights-progress .meter { width: 120px; flex-shrink: 0; }
+
+/* Uebernommene Vorschlaege */
+.check--carried .check-name { color: var(--ink-2); }
+.carried-hint {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.check--carried .bool button[aria-pressed='true'],
+.check--carried .scale button[aria-pressed='true'],
+.check--carried .choice button[aria-pressed='true'],
+.check--carried .multi button[aria-pressed='true'] {
+  background: transparent; color: var(--cobalt);
+  border-color: color-mix(in srgb, var(--cobalt) 45%, var(--line-strong));
+  border-style: dashed;
+}
+.check--carried .stepper input { color: var(--ink-3); }
 
 /* ============================ Future Me ============================ */
 
@@ -353,7 +793,90 @@ h2.section-title {
 .fm-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
 .fm-meta .mono { font-size: 11.5px; }
 
-.fm-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.fm-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Der Termin ist anklickbar — dort aendert man ihn, ohne den Rhythmus anzufassen. */
+.chip--btn { cursor: pointer; transition: filter .13s; }
+.chip--btn:hover { filter: brightness(.95); }
+.chip-date {
+  font-family: var(--mono); font-size: 10.5px; opacity: .65;
+  padding-left: 7px; margin-left: 1px;
+  border-left: 1px solid currentColor;
+}
+
+/* Bearbeiten und Abbestellen: unaufdringlich, aber sichtbar — dass der
+   Titel anklickbar ist, sieht man ihm nicht an. */
+.fm-act {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--ink-4); font-size: 13px;
+  transition: color .13s, background .13s;
+}
+.fm-act:hover { color: var(--ink); background: var(--paper-sunk); }
+.fm-act--drop:hover { color: var(--signal); background: var(--signal-wash); }
+
+.reset-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 13px 16px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+/* Kategorie waehlen oder neu schreiben */
+.catpick { position: relative; }
+
+.catpick-field {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 13px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  text-align: left; font-size: 15px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.catpick-field:hover { border-color: var(--ink-3); }
+.catpick-field[aria-expanded='true'] {
+  border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-wash);
+}
+.catpick-field span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catpick-field--empty span:first-child { color: var(--ink-4); }
+.catpick-caret {
+  flex-shrink: 0; font-size: 13px; color: var(--ink-4);
+  transition: transform .18s;
+}
+.catpick-caret--open { transform: rotate(90deg); }
+
+.catpick-panel {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 6px);
+  background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+
+.catpick-search {
+  width: 100%; padding: 10px 13px;
+  border: 0; border-bottom: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink);
+  outline: none; font-size: 14px;
+}
+.catpick-search::placeholder { color: var(--ink-4); }
+
+.catpick-list { max-height: 260px; overflow-y: auto; padding: 4px; }
+
+.catpick-row {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 8px 10px; border-radius: 7px;
+  font-size: 14px; color: var(--ink-2); text-align: left;
+  transition: background .12s, color .12s;
+}
+.catpick-row:hover { background: var(--paper-sunk); color: var(--ink); }
+.catpick-row .mono { margin-left: auto; font-size: 11px; color: var(--ink-4); }
+.catpick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catpick-row--on { color: var(--cobalt); font-weight: 600; }
+.catpick-row--new { color: var(--cobalt); font-weight: 550; }
+.catpick-row--new svg { font-size: 13px; }
+
+.catpick-empty { padding: 12px 10px; font-size: 13px; color: var(--ink-3); }
 
 /* Catalog picker */
 .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 9px; }
@@ -364,18 +887,80 @@ h2.section-title {
   transition: all .13s;
 }
 .cat-row:hover { border-color: var(--cobalt); background: var(--cobalt-wash); }
-.cat-row--added { opacity: .45; pointer-events: none; }
+.cat-row--added { border-color: var(--good); background: var(--good-wash); }
+.cat-row--added:hover { border-color: var(--signal); background: var(--signal-wash); }
+.cat-row--added .cat-plus { color: var(--good); font-size: 13px; }
+.cat-row--added:hover .cat-plus { color: var(--signal); }
 .cat-row-title { font-size: 13.5px; font-weight: 550; }
 .cat-row-sub { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 .cat-plus { margin-left: auto; color: var(--ink-4); font-size: 18px; line-height: 1; }
+
+/* Monatsuebersicht im Kalender-Blatt */
+.cal { display: flex; flex-direction: column; gap: 14px; }
+
+.cal-head { display: flex; align-items: center; gap: 8px; }
+.cal-list { max-width: 440px; }
+.cal-month {
+  font-family: var(--display); font-weight: 600; font-size: 18px;
+  letter-spacing: -.015em; min-width: 168px;
+}
+
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  /* Auf dem breiten Blatt sonst ein Raster aus Querformaten. */
+  width: 100%; max-width: 440px;
+}
+.cal-head { max-width: 440px; }
+.cal-wd {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+  text-align: center; padding-bottom: 2px;
+}
+
+.cal-cell {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 0 6px;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  font-size: 13px; color: var(--ink-2);
+  transition: background .12s, border-color .12s, color .12s;
+}
+.cal-cell--out { pointer-events: none; }
+.cal-cell:hover { background: var(--paper-sunk); }
+.cal-cell--has { color: var(--ink); font-weight: 600; }
+.cal-cell--today { border-color: var(--line-strong); }
+.cal-cell--sel { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+
+/* Ein Punkt je Eintrag, hoechstens drei. Die Zeile steht auch auf leeren
+   Tagen, sonst huepfen die Zahlen. */
+.cal-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cobalt); }
+.cal-dot--late { background: var(--signal); }
+.cal-cell--sel .cal-dot { background: rgba(255, 255, 255, .85); }
+
+.cal-list {
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 84px;
+  padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.cal-list-head { font-size: 12.5px; color: var(--ink-3); }
+.cal-empty { font-size: 13px; color: var(--ink-3); }
+.cal-item { display: flex; flex-direction: column; gap: 2px; }
+.cal-item-title { font-size: 14px; font-weight: 600; }
+.cal-item-meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 
 /* ============================ Board ============================ */
 
 /* dvh statt vh wegen der einklappenden Browserleiste auf dem iPhone; die
    Safe-Area-Insets kommen raus, weil das Board bis an die Kante laeuft. */
 .board-wrap {
-  position: relative;
-  height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  /* Fest am Bildschirm statt im Fluss: so endet das Board exakt am unteren
+     Rand, ohne dass eine Viewport-Einheit geraten werden muss. */
+  position: fixed;
+  left: 0; right: 0;
+  top: var(--topbar-b, 64px);
+  bottom: env(safe-area-inset-bottom, 0px);
   overflow: hidden;
   background: var(--paper-sunk);
 }
@@ -383,6 +968,9 @@ h2.section-title {
 .board-canvas {
   position: absolute; inset: 0;
   cursor: crosshair;
+  /* Der Browser darf hier nichts abfangen — Wischen und Aufziehen gehoeren
+     dem Board, nicht dem Scrollen. */
+  touch-action: none;
   background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1px);
   background-size: 26px 26px;
 }
@@ -390,48 +978,144 @@ h2.section-title {
 
 .board-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 
+/* Die Karte traegt ihre Farbe selbst: getoente Flaeche, Kante im selben Ton.
+   So lassen sich Gruppen auch im herausgezoomten Zustand auseinanderhalten,
+   statt dass nur ein Streifen am Rand davon erzaehlt. `--n` setzt die
+   Komponente je Knoten. */
 .node {
   position: absolute;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-2);
-  padding: 11px 13px;
+  touch-action: none;
+  --tint: color-mix(in srgb, var(--n) 7%, var(--surface));
+  --edge: color-mix(in srgb, var(--n) 32%, var(--line-strong));
+  background: var(--tint);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(20, 22, 28, .045),
+    0 8px 22px -10px rgba(20, 22, 28, .18);
+  padding: 13px 15px;
   cursor: grab;
   user-select: none;
-  transition: box-shadow .15s, border-color .15s;
+  transition: box-shadow .18s, border-color .18s, transform .18s;
 }
-.node:hover { box-shadow: var(--shadow-3); }
-.node--sel { border-color: var(--cobalt); box-shadow: 0 0 0 2px var(--cobalt-wash), var(--shadow-3); }
-.node--dragging { cursor: grabbing; box-shadow: var(--shadow-3); }
-.node-accent { position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; }
-.node-text {
-  font-size: 13.5px; line-height: 1.42; white-space: pre-wrap; word-break: break-word;
-  outline: none; min-height: 19px;
-}
-.node-text:focus { cursor: text; }
-.node--goal { border-width: 1.5px; }
-.node-goalbadge {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-top: 7px; font-family: var(--mono); font-size: 10px;
-  color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em;
+:root[data-theme='dark'] .node { --tint: color-mix(in srgb, var(--n) 16%, var(--surface)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .node { --tint: color-mix(in srgb, var(--n) 16%, var(--surface)); }
 }
 
-.frame {
-  position: absolute; border: 1.5px dashed var(--line-strong);
-  border-radius: var(--r-lg); background: color-mix(in srgb, var(--surface) 42%, transparent);
-  cursor: grab;
+.node:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 2px rgba(20, 22, 28, .05),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
 }
-.frame--sel { border-color: var(--cobalt); border-style: solid; }
+/* Doppelte Klasse, sonst gewinnt `.node:hover` mit seinem eigenen Schatten
+   und die Auswahl verschwindet genau dann, wenn der Zeiger noch draufsteht.
+   Ausgewaehlt heisst: derselbe Rand, nur kraeftiger und in voller Farbe.
+   Ein kobaltblauer Ring waere bequemer, macht aber aus einem orangen Ding
+   beim Anwaehlen ein blaues — und dann heisst die Farbe ploetzlich
+   "ausgewaehlt" statt "gehoert zu dieser Gruppe".
+   Das Polster gleicht die dickere Kante aus, sonst wuechse die Karte. */
+.node.node--sel {
+  border-width: 2px;
+  border-color: var(--n);
+  padding: 12px 14px;
+  box-shadow:
+    0 1px 2px rgba(20, 22, 28, .05),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
+}
+.node--dragging {
+  cursor: grabbing; opacity: .9;
+  transform: translateY(-2px) rotate(-.6deg);
+  box-shadow: 0 20px 40px -14px rgba(20, 22, 28, .34);
+}
+/* Der Knoten, auf dem gerade losgelassen wuerde. */
+.node.node--drop {
+  box-shadow:
+    0 0 0 2px var(--paper-sunk),
+    0 0 0 5px var(--cobalt),
+    0 14px 30px -12px rgba(20, 22, 28, .26);
+}
+
+.node-text {
+  font-size: 14px; line-height: 1.45; letter-spacing: -.005em;
+  white-space: pre-wrap; word-break: break-word;
+  outline: none; min-height: 20px;
+}
+.node-text:focus { cursor: text; }
+.node-text:empty::before {
+  content: 'Schreib was…';
+  color: var(--ink-4);
+}
+
+/* Ziele sind die Knoten, auf die etwas einzahlt — sie duerfen lauter sein. */
+.node--goal {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--n) 55%, var(--line-strong));
+}
+.node--goal .node-text { font-weight: 600; }
+
+.node-goal-foot {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 11px; padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--n) 20%, var(--line));
+}
+.node-goal-tag {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: color-mix(in srgb, var(--n) 70%, var(--ink-3));
+  white-space: nowrap;
+}
+/* Wie stark das Ziel in den letzten 30 Tagen bedient wurde. */
+.node-goal-bar {
+  flex: 1; height: 4px; border-radius: 2px;
+  background: color-mix(in srgb, var(--n) 15%, var(--paper-sunk));
+  overflow: hidden;
+}
+.node-goal-bar i {
+  display: block; height: 100%; border-radius: 2px;
+  background: var(--n);
+  transition: width .5s cubic-bezier(.2,.9,.2,1);
+}
+.node-goal-pct {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Der Bereich umreisst, er deckt nicht ab: durchscheinender Grund, damit das
+   Board darunter sichtbar bleibt, und ein durchgezogener Rahmen in seiner
+   Farbe. */
+.frame {
+  position: absolute; touch-action: none;
+  border: 1.5px solid color-mix(in srgb, var(--n, var(--line-strong)) 55%, var(--line-strong));
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  cursor: grab;
+  transition: border-color .18s, border-width .12s, background .18s;
+}
+/* Wie beim Knoten: kein blauer Ring, sondern der eigene Rahmen kraeftiger.
+   `box-sizing: border-box` haelt dabei die Aussenkante an ihrem Platz, der
+   Bereich springt also nicht. */
+.frame.frame--sel {
+  border-width: 4px;
+  border-color: var(--n, var(--ink));
+}
+.frame.frame--sel > .frame-label {
+  border-width: 2px;
+  border-color: var(--n, var(--ink));
+  color: var(--ink);
+}
 .frame-label {
   position: absolute; top: -12px; left: 14px;
+  z-index: 1;
   padding: 2px 9px; border-radius: var(--r-pill);
-  background: var(--surface); border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--n, var(--line-strong)) 45%, var(--line-strong));
   font-size: 11.5px; font-weight: 600; color: var(--ink-2);
   outline: none; white-space: nowrap;
 }
 .frame-resize {
-  position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px;
+  position: absolute; right: -8px; bottom: -8px; width: 18px; height: 18px;
   border-radius: 3px; background: var(--surface); border: 1.5px solid var(--line-strong);
   cursor: nwse-resize;
 }
@@ -442,17 +1126,20 @@ h2.section-title {
 .edge-hit { stroke: transparent; stroke-width: 14; fill: none; pointer-events: stroke; cursor: pointer; }
 
 .port {
-  position: absolute; width: 11px; height: 11px; border-radius: 50%;
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
   background: var(--surface); border: 1.5px solid var(--cobalt);
-  right: -6px; top: 50%; margin-top: -5.5px;
+  right: -7px; top: 50%; margin-top: -7px;
   cursor: crosshair; opacity: 0; transition: opacity .13s, transform .13s;
 }
 .node:hover .port, .node--sel .port { opacity: 1; }
+@media (hover: none) { .port { opacity: 1; } }
 .port:hover { transform: scale(1.35); }
 
 .board-toolbar {
-  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
   display: flex; align-items: center; gap: 4px;
+  max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center;
   padding: 6px; border-radius: var(--r-pill);
   background: var(--surface); border: 1px solid var(--line);
   box-shadow: var(--shadow-3); z-index: 10;
@@ -474,6 +1161,131 @@ h2.section-title {
   pointer-events: none;
 }
 .board-hud > * { pointer-events: auto; }
+/* Die beiden Panels liegen nebeneinander und brechen um, wenn der Schirm
+   zu schmal wird. */
+.board-panels {
+  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+  max-width: calc(100vw - 40px);
+}
+
+.board-switch { width: 200px; }
+.board-switch-current {
+  padding: 8px 12px 10px;
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.board-row {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 4px 2px 9px; border-radius: 7px;
+  transition: background .12s;
+}
+.board-row:hover { background: var(--paper-sunk); }
+.board-row--on { background: var(--cobalt-wash); }
+.board-row--on .board-row-name { color: var(--cobalt); font-weight: 600; }
+
+.board-row-name {
+  flex: 1; min-width: 0; padding: 6px 0;
+  font-size: 13px; color: var(--ink-2); text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.board-row .mono { font-size: 11px; color: var(--ink-4); padding: 0 2px; }
+
+.board-row-act {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: grid; place-items: center;
+  color: var(--ink-4); font-size: 12px;
+  transition: color .12s, background .12s;
+}
+.board-row-act:hover { color: var(--ink); background: var(--surface); }
+.board-row-act--drop:hover { color: var(--signal); background: var(--signal-wash); }
+
+.board-rename {
+  width: 100%; padding: 6px 8px; margin: 1px 0;
+  border: 1px solid var(--cobalt); border-radius: 6px;
+  background: var(--surface); color: var(--ink);
+  font-size: 13px; outline: none;
+}
+
+/* Verzeichnis der Bereiche. Liegt links ueber dem Board und faehrt das
+   Bild auf den angetippten Bereich. */
+.board-index {
+  width: 216px; max-width: calc(100vw - 40px);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.board-index-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 9px 12px;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.board-index-head .mono {
+  margin-left: auto; font-size: 11px; font-weight: 400;
+  color: var(--ink-4); letter-spacing: 0;
+}
+.board-index-head:hover { background: var(--paper-sunk); }
+.board-index-caret {
+  font-size: 12px; color: var(--ink-4);
+  transition: transform .2s;
+}
+.board-index-caret--open { transform: rotate(90deg); }
+
+.board-index-list {
+  display: flex; flex-direction: column;
+  padding: 4px; gap: 1px;
+  border-top: 1px solid var(--line);
+  max-height: min(48vh, 380px); overflow-y: auto;
+}
+
+.board-index-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px; border-radius: 7px;
+  font-size: 13px; color: var(--ink-2); text-align: left;
+  transition: background .12s, color .12s;
+}
+.board-index-row:hover { background: var(--paper-sunk); color: var(--ink); }
+.board-index-row .mono { margin-left: auto; font-size: 11px; color: var(--ink-4); }
+
+.board-index-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.board-index-dot--none {
+  background: transparent; border: 1.5px dashed var(--line-strong);
+  width: 9px; height: 9px;
+}
+.board-index-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.board-index-row--loose { color: var(--ink-3); }
+.board-index-row--all {
+  justify-content: center;
+  margin-top: 3px; border-top: 1px solid var(--line); border-radius: 0 0 7px 7px;
+  padding-top: 9px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+
+.board-index-empty {
+  padding: 10px 10px 12px;
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-3);
+}
+
+/* Der Bereich, ueber dem die Maus in der Liste steht. */
+/* Hervorhebung beim Ueberfahren der Liste: eine Aufhellung in der eigenen
+   Farbe des Bereichs. Frueher wurde hier der Rand auf Kobalt gesetzt — nach
+   einem Klick blieb der Zeiger auf der Zeile stehen, und ein oranger Bereich
+   sah nach dem Hinfahren dauerhaft blau aus. */
+.frame--hot {
+  background: color-mix(in srgb, var(--n, var(--cobalt)) 10%, transparent);
+}
+
+/* Nur beim Anspringen aus der Liste — waehrend des Ziehens wuerde eine
+   Ueberblendung dem Finger hinterherhaengen. */
+.board-layer--gliding { transition: transform .44s cubic-bezier(.22, .8, .24, 1); }
+
 .board-hint {
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
   background: color-mix(in srgb, var(--surface) 80%, transparent);
@@ -495,6 +1307,7 @@ h2.section-title {
 
 .scrim {
   position: fixed; inset: 0; z-index: 60;
+  overscroll-behavior: contain;
   background: rgba(20, 22, 28, .3);
   backdrop-filter: blur(3px);
   display: grid; place-items: center; padding: 24px;
@@ -515,8 +1328,15 @@ h2.section-title {
   display: flex; align-items: center; gap: 16px;
   padding: 20px 22px 16px; border-bottom: 1px solid var(--line);
 }
-.sheet-head h3 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0; }
-.sheet-body { padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.sheet-head h3 { font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: -.02em; margin: 0; }
+.sheet-body {
+  padding: 20px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  /* Am Ende der Liste soll nicht die Seite dahinter weiterscrollen. */
+  overscroll-behavior: contain;
+}
+/* Ohne das drueckt der Flex-Container Kacheln und Diagramme zusammen,
+   sobald der Inhalt laenger wird als das Blatt. */
+.sheet-body > * { flex-shrink: 0; }
 .sheet-foot {
   display: flex; align-items: center; gap: 10px; justify-content: flex-end;
   padding: 14px 22px; border-top: 1px solid var(--line); background: var(--surface-2);
@@ -528,6 +1348,33 @@ h2.section-title {
   transition: all .13s;
 }
 .iconbtn:hover { color: var(--ink); background: var(--paper-sunk); }
+
+/* Konto-Blatt */
+.acc-rows {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+}
+.acc-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 14px; min-height: 46px;
+}
+.acc-row + .acc-row { border-top: 1px solid var(--line); }
+.acc-k {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-4); width: 54px; flex-shrink: 0;
+}
+.acc-v { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.acc-name { flex: 1; }
+.acc-name .input { padding: 5px 9px; font-size: 14px; }
+/* Das Konto-Dropdown soll die Zeile nicht ausfuellen — `.select` ist auf
+   volle Breite gebaut, hier steht es neben einer Beschriftung. */
+.acc-pick { width: auto; min-width: 9rem; padding: 5px 9px; font-size: 14px; }
+
+/* Ein Punkt am Konto-Knopf, wenn der Abgleich klemmt. */
+.dot-warn {
+  display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  border-radius: 50%; background: var(--signal); vertical-align: middle;
+}
 
 /* ============================ Toast ============================ */
 
@@ -545,6 +1392,12 @@ h2.section-title {
 .toast b { font-family: var(--mono); color: var(--cobalt-deep); }
 :root:not([data-theme='dark']) .toast b { color: #93A6FF; }
 
+/* Ist ein Blatt offen, sitzt unten rechts sein Fuss — und damit "Fertig".
+   Die Meldung geht dann nach oben, statt den Knopf zu verdecken. */
+:root[data-sheet] .toasts {
+  top: 16px; bottom: auto; left: 0; right: 0; align-items: center;
+}
+
 /* ============================ Responsive ============================ */
 
 @media (max-width: 860px) {
@@ -555,28 +1408,56 @@ h2.section-title {
   .fm-cat span { display: none; }
 }
 
-@media (max-width: 900px) {
+/* Die kurzen Seitennamen halten bis dort, wo der ausgeschriebene Titel und
+   die langen Namen zusammen wirklich Platz haben. Vorher legte sich der
+   Titel ueber die Navigation, weil er nicht umbricht. */
+@media (max-width: 1120px) {
   .nav-long { display: none; }
   .nav-short { display: inline; }
 }
 
+/* Unterhalb dieser Breite steht der Titel in einer eigenen Zeile ueber der
+   Navigation — nebeneinander passt beides nicht mehr. */
+@media (max-width: 900px) {
+  .topbar {
+    padding: 8px 14px; gap: 8px 10px; height: auto;
+    flex-wrap: wrap; align-items: center;
+  }
+  .brand { order: 1; }
+  .topbar-right { order: 2; margin-left: auto; }
+  .nav { order: 3; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+}
+
 @media (max-width: 680px) {
   .main { padding: 28px 16px 80px; }
-  .topbar { padding: 0 14px; gap: 8px; height: 58px; }
-  .nav { margin-left: 0; overflow-x: auto; scrollbar-width: none; }
+  /* Auf dem Handy konkurriert die Zoomanzeige mit der Werkzeugleiste. */
+  .zoomctl { display: none; }
+  .board-index { width: 176px; }
+  .board-switch { width: 160px; }
+  .board-index-list { max-height: 38vh; }
+  /* Der Balken rutscht unter den Text, statt ihn auf vier Woerter zu quetschen. */
+  .insights-progress > span:first-child { flex-basis: 100%; }
+  .insight { grid-template-columns: 1fr; gap: 10px; }
+  .board-toolbar { gap: 2px; padding: 5px; }
+  .board-toolbar .btn { padding: 6px 9px; }
+  .swatch { width: 26px; height: 26px; }
+  .swatch i { width: 17px; height: 17px; }
+  .wordmark { font-size: 10.5px; letter-spacing: .13em; }
+  .wordmark i { font-size: 15px; }
+  .brand-mark { font-size: 21px; }
   .nav::-webkit-scrollbar { display: none; }
   .nav-item { padding: 6px 9px; font-size: 13px; }
-  .brand { font-size: 21px; }
-  .brand-name { display: none; }
   .topbar-right { gap: 6px; }
-  /* Level und XP stehen auf kleinen Screens im Konto-Sheet, nicht in der Leiste. */
-  .xp { display: none; }
-  .today-head { gap: 16px; }
+  .today-head { gap: 16px; margin-bottom: 20px; }
   .today-head > div:last-child { flex-wrap: wrap; }
+  .daybar { margin: 0 -16px 22px; padding: 8px 16px; }
+  /* Auf 390 px muessen Pfeile, Datum und der Weg zurueck in eine Zeile. */
+  .datepick-label { min-width: 0; font-size: 13px; padding: 0 2px; }
   .check-grid { grid-template-columns: 1fr; }
+  .scale { grid-template-columns: repeat(10, 1fr); }
   .fm-item { grid-template-columns: auto 1fr; row-gap: 10px; }
   .fm-right { grid-column: 2; }
-  .board-wrap { height: calc(100dvh - 58px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .sheet { max-height: 88vh; }
   .scrim { padding: 12px; align-items: flex-end; }
 }

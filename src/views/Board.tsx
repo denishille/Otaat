@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useStore, update, uid, commit } from '../lib/store'
 import type { BoardFrame, BoardNode, NodeColor } from '../lib/types'
 import { goalMomentum } from '../lib/scoring'
-import { Link, Plus, Trash } from '../components/Icons'
+import { ChevR, Link, Pencil, Plus, Trash } from '../components/Icons'
+import { isTouch, noAutofill } from '../lib/device'
 
 const COLORS: NodeColor[] = ['slate', 'cobalt', 'signal', 'moss', 'plum', 'amber']
 const NODE_W = 208
@@ -34,18 +35,37 @@ export function Board() {
   const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null)
   const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+  /** Knoten, auf dem der gezogene gerade schwebt — daraus wird beim Loslassen eine Linie. */
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  /** Weiche Fahrt beim Anspringen eines Bereichs — nur dann, sonst ruckelt das Ziehen. */
+  const [gliding, setGliding] = useState(false)
+  const [hotFrame, setHotFrame] = useState<string | null>(null)
+  const [indexOpen, setIndexOpen] = useState(!isTouch)
+  const [boardsOpen, setBoardsOpen] = useState(false)
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const indexRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
 
-  const { nodes, frames, edges } = state
+  /** Alle Finger, die gerade auf dem Board liegen. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  /** Aktiv, sobald zwei Finger drauf sind — hat Vorrang vor jedem Ziehen. */
+  const pinch = useRef<{ dist: number; cx: number; cy: number; view: typeof view } | null>(null)
+  /** Damit der Effekt unten immer den aktuellen Zoom sieht, ohne neu zu binden. */
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  const board = state.meta.activeBoard
+  const nodes = state.nodes.filter((n) => n.board === board)
+  const frames = state.frames.filter((f) => f.board === board)
+  const edges = state.edges.filter((e) => e.board === board)
 
   /* ------------------ Koordinaten ------------------ */
 
-  const toWorld = useCallback(
-    (clientX: number, clientY: number) => {
-      const r = wrapRef.current!.getBoundingClientRect()
-      return { x: (clientX - r.left - view.x) / view.z, y: (clientY - r.top - view.y) / view.z }
-    },
-    [view],
-  )
+  const toWorld = useCallback((clientX: number, clientY: number) => {
+    const r = wrapRef.current!.getBoundingClientRect()
+    const v = viewRef.current
+    return { x: (clientX - r.left - v.x) / v.z, y: (clientY - r.top - v.y) / v.z }
+  }, [])
 
   /* ------------------ Groessen messen ------------------ */
 
@@ -63,7 +83,7 @@ export function Board() {
 
   function addNode(x: number, y: number, text = '') {
     const id = uid()
-    update((d) => { d.nodes.push({ id, x: x - NODE_W / 2, y: y - 22, w: NODE_W, text, color: 'slate' }) })
+    update((d) => { d.nodes.push({ id, board, x: x - NODE_W / 2, y: y - 22, w: NODE_W, text, color: 'slate' }) })
     setSel({ kind: 'node', id })
     setEditingId(id)
     return id
@@ -73,7 +93,7 @@ export function Board() {
     const r = wrapRef.current!.getBoundingClientRect()
     const c = toWorld(r.left + r.width / 2, r.top + r.height / 2)
     const id = uid()
-    update((d) => { d.frames.push({ id, x: c.x - 210, y: c.y - 150, w: 420, h: 300, label: 'Neuer Bereich', color: 'slate' }) })
+    update((d) => { d.frames.push({ id, board, x: c.x - 210, y: c.y - 150, w: 420, h: 300, label: 'Neuer Bereich', color: 'slate' }) })
     setSel({ kind: 'frame', id })
   }
 
@@ -108,20 +128,48 @@ export function Board() {
 
   /* ------------------ Pointer ------------------ */
 
+  /**
+   * Meldet einen Finger an. Ab dem zweiten wird gezoomt statt gezogen —
+   * ein angefangenes Ziehen wird dabei abgebrochen, sonst wandert der Knoten
+   * beim Aufziehen mit.
+   */
+  function track(e: React.PointerEvent): boolean {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()]
+      pinch.current = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        cx: (a.x + b.x) / 2,
+        cy: (a.y + b.y) / 2,
+        view: viewRef.current,
+      }
+      setDrag(null)
+      setWire(null)
+    }
+    return pointers.current.size === 1
+  }
+
   function onCanvasDown(e: React.PointerEvent) {
     if (e.button !== 0 && e.button !== 1) return
+    if (!track(e)) return
     setDrag({ kind: 'pan', startX: e.clientX, startY: e.clientY, origin: { x: view.x, y: view.y }, moved: false })
   }
 
   function onNodeDown(e: React.PointerEvent, n: BoardNode) {
     if (editingId === n.id) return
     e.stopPropagation()
+    if (!track(e)) return
+    const already = sel?.kind === 'node' && sel.id === n.id
     setSel({ kind: 'node', id: n.id })
-    setDrag({ kind: 'node', id: n.id, startX: e.clientX, startY: e.clientY, origin: { x: n.x, y: n.y }, moved: false })
+    setDrag({
+      kind: 'node', id: n.id, startX: e.clientX, startY: e.clientY,
+      origin: { x: n.x, y: n.y }, wasSelected: already, moved: false,
+    })
   }
 
   function onFrameDown(e: React.PointerEvent, f: BoardFrame) {
     e.stopPropagation()
+    if (!track(e)) return
     setSel({ kind: 'frame', id: f.id })
     const carried = nodes
       .filter((n) => {
@@ -141,21 +189,64 @@ export function Board() {
 
   function onResizeDown(e: React.PointerEvent, f: BoardFrame) {
     e.stopPropagation()
+    if (!track(e)) return
     setSel({ kind: 'frame', id: f.id })
     setDrag({ kind: 'resize', id: f.id, startX: e.clientX, startY: e.clientY, origin: { x: f.x, y: f.y }, frameSize: { w: f.w, h: f.h }, moved: false })
   }
 
   function onPortDown(e: React.PointerEvent, n: BoardNode) {
     e.stopPropagation()
+    if (!track(e)) return
     const p = toWorld(e.clientX, e.clientY)
     setWire({ from: n.id, x: p.x, y: p.y })
     setDrag({ kind: 'connect', id: n.id, startX: e.clientX, startY: e.clientY, origin: { x: 0, y: 0 }, moved: false })
   }
 
+  /* Pinch und Fingerbuchhaltung laufen unabhaengig vom Ziehen — sonst waeren
+     beim Aufziehen ohne aktiven Drag gar keine Listener gebunden. */
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      const p = pinch.current
+      if (!p || pointers.current.size < 2) return
+      const [a, b] = [...pointers.current.values()]
+      const dist = Math.hypot(a.x - b.x, a.y - b.y)
+      if (p.dist < 1) return
+
+      const r = wrapRef.current!.getBoundingClientRect()
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, p.view.z * (dist / p.dist)))
+      const k = z / p.view.z
+      // Der Punkt zwischen den Fingern bleibt stehen, und das Board folgt
+      // zusaetzlich, wenn die beiden Finger gemeinsam wandern.
+      const cx = (a.x + b.x) / 2 - r.left
+      const cy = (a.y + b.y) / 2 - r.top
+      const ox = p.cx - r.left
+      const oy = p.cy - r.top
+      setView({ z, x: cx - (ox - p.view.x) * k, y: cy - (oy - p.view.y) * k })
+    }
+
+    const onUp = (e: PointerEvent) => {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size < 2) pinch.current = null
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [])
+
   useEffect(() => {
     if (!drag) return
 
     const onMove = (e: PointerEvent) => {
+      if (pinch.current) return
       const dx = e.clientX - drag.startX
       const dy = e.clientY - drag.startY
       if (!drag.moved && Math.hypot(dx, dy) > 3) drag.moved = true
@@ -165,23 +256,29 @@ export function Board() {
       } else if (drag.kind === 'node') {
         update((d) => {
           const n = d.nodes.find((x) => x.id === drag.id)
-          if (n) { n.x = drag.origin.x + dx / view.z; n.y = drag.origin.y + dy / view.z }
+          if (n) { n.x = drag.origin.x + dx / viewRef.current.z; n.y = drag.origin.y + dy / viewRef.current.z }
         }, { transient: true })
+        // Einen Knoten auf einen anderen ziehen verbindet die beiden.
+        if (drag.moved) {
+          const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-node]')
+          const over = el?.getAttribute('data-node')
+          setDropTarget(over && over !== drag.id ? over : null)
+        }
       } else if (drag.kind === 'frame') {
         update((d) => {
           const f = d.frames.find((x) => x.id === drag.id)
-          if (f) { f.x = drag.origin.x + dx / view.z; f.y = drag.origin.y + dy / view.z }
+          if (f) { f.x = drag.origin.x + dx / viewRef.current.z; f.y = drag.origin.y + dy / viewRef.current.z }
           for (const c of drag.carried ?? []) {
             const n = d.nodes.find((x) => x.id === c.id)
-            if (n) { n.x = c.x + dx / view.z; n.y = c.y + dy / view.z }
+            if (n) { n.x = c.x + dx / viewRef.current.z; n.y = c.y + dy / viewRef.current.z }
           }
         }, { transient: true })
       } else if (drag.kind === 'resize') {
         update((d) => {
           const f = d.frames.find((x) => x.id === drag.id)
           if (f && drag.frameSize) {
-            f.w = Math.max(160, drag.frameSize.w + dx / view.z)
-            f.h = Math.max(120, drag.frameSize.h + dy / view.z)
+            f.w = Math.max(160, drag.frameSize.w + dx / viewRef.current.z)
+            f.h = Math.max(120, drag.frameSize.h + dy / viewRef.current.z)
           }
         }, { transient: true })
       } else if (drag.kind === 'connect') {
@@ -198,21 +295,45 @@ export function Board() {
           const exists = edges.some(
             (g) => (g.from === wire.from && g.to === target) || (g.from === target && g.to === wire.from),
           )
-          if (!exists) update((d) => { d.edges.push({ id: uid(), from: wire.from, to: target }) })
+          if (!exists) update((d) => { d.edges.push({ id: uid(), board, from: wire.from, to: target }) })
         }
         setWire(null)
       }
+      if (drag.kind === 'node' && dropTarget && dropTarget !== drag.id) {
+        const from = drag.id!
+        const to = dropTarget
+        update((d) => {
+          // Der gezogene Knoten springt zurueck — die Geste war das Verbinden,
+          // nicht das Verschieben. Sonst laegen die beiden uebereinander.
+          const n = d.nodes.find((x) => x.id === from)
+          if (n) { n.x = drag.origin.x; n.y = drag.origin.y }
+          const exists = d.edges.some(
+            (g) => (g.from === from && g.to === to) || (g.from === to && g.to === from),
+          )
+          if (!exists) d.edges.push({ id: uid(), board, from, to })
+        })
+        setDropTarget(null)
+        setDrag(null)
+        return
+      }
+      setDropTarget(null)
       commit()
       // Erster Klick raeumt die Auswahl ab, der naechste legt an — auf der
       // freien Flaeche wie innerhalb eines Bereichs.
-      if (drag.kind === 'pan' && !drag.moved) {
+      const multiTouch = pinch.current !== null || pointers.current.size > 0
+      if (drag.kind === 'pan' && !drag.moved && !multiTouch) {
         if (sel) setSel(null)
         else {
           const p = toWorld(e.clientX, e.clientY)
           addNode(p.x, p.y)
         }
       }
-      if (drag.kind === 'frame' && !drag.moved && drag.wasSelected) {
+      // Ohne Maus gibt es keinen Doppelklick — ein Tipp auf den gewaehlten
+      // Knoten oeffnet deshalb den Text.
+      if (drag.kind === 'node' && !drag.moved && drag.wasSelected && !multiTouch) {
+        setEditingId(drag.id!)
+      }
+      if (drag.kind === 'frame' && !drag.moved && drag.wasSelected && !multiTouch) {
         const p = toWorld(e.clientX, e.clientY)
         addNode(p.x, p.y)
       }
@@ -221,12 +342,14 @@ export function Board() {
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag, wire, view.z, sel, edges])
+  }, [drag, wire, sel, edges, dropTarget])
 
   /* ------------------ Zoom & Tasten ------------------ */
 
@@ -263,6 +386,131 @@ export function Board() {
     return () => window.removeEventListener('keydown', onKey)
   }, [removeSelected])
 
+  /**
+   * Faehrt so, dass das Rechteck ganz im freien Teil des Bildes liegt.
+   * Links bleibt Platz fuer das Verzeichnis, unten fuer die Werkzeugleiste —
+   * sonst landet genau das, was man anspringt, hinter einem Bedienelement.
+   */
+  function glideTo(
+    x: number, y: number, w: number, h: number,
+    opts?: { instant?: boolean; ignoreIndex?: boolean },
+  ) {
+    const pad = 64
+    const r = wrapRef.current!.getBoundingClientRect()
+    if (w <= 0 || h <= 0) return
+
+    // Die Bedienelemente werden gemessen, nicht geschaetzt. Und es wird nur
+    // ausgewichen, solange danach noch eine brauchbare Flaeche uebrig bleibt:
+    // auf dem Handy deckt das Verzeichnis die halbe Breite ab, dort wuerde
+    // ein fester Abstand den Bereich auf einen Streifen am Rand quetschen.
+    let left = pad
+    const ip = opts?.ignoreIndex ? null : indexRef.current?.getBoundingClientRect()
+    if (ip && ip.width > 0 && r.width - ip.width - pad * 2 >= 280) left = ip.right - r.left + 20
+
+    let bottom = pad
+    const tb = toolbarRef.current?.getBoundingClientRect()
+    if (tb && tb.height > 0 && r.height - tb.height - pad * 2 >= 240) bottom = r.bottom - tb.top + 16
+
+    const availW = Math.max(120, r.width - left - pad)
+    const availH = Math.max(120, r.height - pad - bottom)
+
+    // Ein kleiner Bereich wuerde sonst auf 200 % und mehr aufgeblasen — man
+    // sieht dann zwar ihn, aber nichts von seiner Umgebung mehr.
+    const z = Math.min(1.6, Math.max(MIN_ZOOM, Math.min(availW / w, availH / h)))
+    if (!opts?.instant) {
+      setGliding(true)
+      window.setTimeout(() => setGliding(false), 460)
+    }
+    setView({
+      z,
+      x: left + (availW - w * z) / 2 - x * z,
+      y: pad + (availH - h * z) / 2 - y * z,
+    })
+  }
+
+  /**
+   * Beim Oeffnen des Boards einmal alles ins Bild holen. Erst wenn jeder
+   * Knoten gemessen ist — vorher waere seine Hoehe geraten und das Bild
+   * saesse schief. Ohne Ueberblendung, sonst faehrt das Board beim Betreten
+   * sichtbar durch die Gegend.
+   */
+  const didFit = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (didFit.current === board) return
+    if (nodes.length === 0 && frames.length === 0) {
+      // Leeres Board: Ausgangslage statt des Ausschnitts vom vorigen.
+      if (didFit.current !== board) { didFit.current = board; setView({ x: 120, y: 120, z: 1 }); setSel(null) }
+      return
+    }
+    if (nodes.some((n) => !sizes[n.id])) return
+    didFit.current = board
+    const e = everything()
+    if (e) glideTo(e.x, e.y, e.w, e.h, { instant: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, nodes, frames, sizes])
+
+  function addBoard() {
+    const id = uid()
+    update((d) => {
+      d.meta.boards.push({ id, name: `Board ${d.meta.boards.length + 1}`, createdAt: new Date().toISOString() })
+      d.meta.activeBoard = id
+    })
+    setRenaming(id)
+    setSel(null)
+  }
+
+  function switchBoard(id: string) {
+    update((d) => { d.meta.activeBoard = id })
+    setSel(null)
+    if (isTouch) setBoardsOpen(false)
+  }
+
+  function renameBoard(id: string, name: string) {
+    const clean = name.trim()
+    update((d) => {
+      const b = d.meta.boards.find((x) => x.id === id)
+      if (b && clean) b.name = clean
+    })
+  }
+
+  /** Ein Board mitsamt allem darauf. Nie das letzte. */
+  function removeBoard(id: string) {
+    update((d) => {
+      if (d.meta.boards.length < 2) return
+      d.meta.boards = d.meta.boards.filter((b) => b.id !== id)
+      d.nodes = d.nodes.filter((n) => n.board !== id)
+      d.frames = d.frames.filter((f) => f.board !== id)
+      d.edges = d.edges.filter((e) => e.board !== id)
+      if (d.meta.activeBoard === id) d.meta.activeBoard = d.meta.boards[0].id
+    })
+    setSel(null)
+  }
+
+  /** Umfassendes Rechteck ueber alles, was auf dem Board liegt. */
+  function everything() {
+    const boxes = [
+      ...frames.map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.h })),
+      ...nodes.map((n) => ({ x: n.x, y: n.y, w: n.w, h: sizes[n.id]?.h ?? 48 })),
+    ]
+    if (!boxes.length) return null
+    const x0 = Math.min(...boxes.map((b) => b.x))
+    const y0 = Math.min(...boxes.map((b) => b.y))
+    const x1 = Math.max(...boxes.map((b) => b.x + b.w))
+    const y1 = Math.max(...boxes.map((b) => b.y + b.h))
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+  }
+
+  /** Welche Knoten liegen in einem Bereich — rein geometrisch, ueber den Mittelpunkt. */
+  const nodesIn = (f: BoardFrame) =>
+    nodes.filter((n) => {
+      const sz = sizes[n.id] ?? { w: n.w, h: 48 }
+      const cx = n.x + sz.w / 2
+      const cy = n.y + sz.h / 2
+      return cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.h
+    })
+
+  const looseNodes = nodes.filter((n) => !frames.some((f) => nodesIn(f).includes(n)))
+
   function zoomBy(f: number) {
     const r = wrapRef.current!.getBoundingClientRect()
     const mx = r.width / 2
@@ -294,11 +542,18 @@ export function Board() {
     <div className={'board-wrap' + (drag?.kind === 'pan' ? ' panning' : '')} ref={wrapRef}>
       <div className="board-canvas" onPointerDown={onCanvasDown}
         style={{ backgroundSize: `${26 * view.z}px ${26 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }}>
-        <div className="board-layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+        <div
+          className={'board-layer' + (gliding ? ' board-layer--gliding' : '')}
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
+        >
 
           {frames.map((f) => (
-            <div key={f.id} className={'frame' + (sel?.kind === 'frame' && sel.id === f.id ? ' frame--sel' : '')}
-              style={{ left: f.x, top: f.y, width: f.w, height: f.h, borderColor: sel?.kind === 'frame' && sel.id === f.id ? undefined : `var(--n-${f.color})`, opacity: f.color === 'slate' ? 1 : 0.9 }}
+            <div key={f.id} className={'frame' + (sel?.kind === 'frame' && sel.id === f.id ? ' frame--sel' : '') + (hotFrame === f.id ? ' frame--hot' : '')}
+              style={{
+                left: f.x, top: f.y, width: f.w, height: f.h,
+                // Der Rahmen faerbt sich im Stylesheet aus diesem Wert.
+                ['--n' as string]: `var(--n-${f.color})`,
+              }}
               onPointerDown={(e) => onFrameDown(e, f)}>
               <div className="frame-label" contentEditable suppressContentEditableWarning
                 onPointerDown={(e) => e.stopPropagation()}
@@ -343,16 +598,17 @@ export function Board() {
                   'node' +
                   (isSel ? ' node--sel' : '') +
                   (n.isGoal ? ' node--goal' : '') +
-                  (drag?.kind === 'node' && drag.id === n.id ? ' node--dragging' : '')
+                  (drag?.kind === 'node' && drag.id === n.id ? ' node--dragging' : '') +
+                  (dropTarget === n.id ? ' node--drop' : '')
                 }
                 style={{
                   left: n.x, top: n.y, width: n.w,
-                  borderColor: isSel ? undefined : `color-mix(in srgb, var(--n-${n.color}) 45%, var(--line-strong))`,
+                  // Die Karte faerbt sich im Stylesheet aus diesem Wert.
+                  ['--n' as string]: `var(--n-${n.color})`,
                 }}
                 onPointerDown={(e) => onNodeDown(e, n)}
                 onDoubleClick={() => setEditingId(n.id)}
               >
-                <div className="node-accent" style={{ background: `var(--n-${n.color})` }} />
                 <div
                   className="node-text"
                   contentEditable={editingId === n.id}
@@ -376,8 +632,18 @@ export function Board() {
                   {n.text}
                 </div>
                 {n.isGoal && (
-                  <div className="node-goalbadge">
-                    Ziel{mom && mom.possible > 0 ? ` · ${Math.round((mom.hits / mom.possible) * 100)}% / 30 T` : ''}
+                  <div className="node-goal-foot">
+                    <span className="node-goal-tag">Ziel</span>
+                    {mom && mom.possible > 0 ? (
+                      <>
+                        <div className="node-goal-bar">
+                          <i style={{ width: `${Math.round((mom.hits / mom.possible) * 100)}%` }} />
+                        </div>
+                        <span className="node-goal-pct">{Math.round((mom.hits / mom.possible) * 100)}%</span>
+                      </>
+                    ) : (
+                      <span className="node-goal-pct">noch kein Check verknüpft</span>
+                    )}
                   </div>
                 )}
                 <div className="port" onPointerDown={(e) => onPortDown(e, n)} title="Verbinden" />
@@ -391,14 +657,148 @@ export function Board() {
         <div className="eyebrow" style={{ background: 'color-mix(in srgb, var(--surface) 80%, transparent)', padding: '6px 11px', borderRadius: 999, backdropFilter: 'blur(6px)' }}>
           Mind my Business
         </div>
-        <div className="board-hint">
-          {nodes.length === 0
-            ? 'Irgendwo hinklicken und losschreiben'
-            : 'Klick = neu · Ziehen = schieben · Punkt rechts = verbinden · ⌘/Strg + Scroll = Zoom'}
+        {/* Der Hinweis kommt zum Verzeichnis dazu, er ersetzt es nicht: sonst
+            verschwindet auf einem leeren Board auch der Board-Schalter, und
+            man kommt nicht mehr zurueck. */}
+        {nodes.length === 0 && frames.length === 0 && (
+          <div className="board-hint">Irgendwo hinklicken und losschreiben</div>
+        )}
+        <div className="board-panels">
+          <div className={'board-index' + (indexOpen ? '' : ' board-index--shut')} ref={indexRef}>
+            <button className="board-index-head" onClick={() => setIndexOpen((o) => !o)}>
+              <span>Bereiche</span>
+              <span className="mono">{frames.length}</span>
+              <ChevR className={'board-index-caret' + (indexOpen ? ' board-index-caret--open' : '')} />
+            </button>
+
+            {indexOpen && (
+              <div className="board-index-list">
+                {frames.map((f) => {
+                  const inside = nodesIn(f)
+                  return (
+                    <button
+                      key={f.id}
+                      className="board-index-row"
+                      onClick={() => {
+                        // Ohne Maus ist das Verzeichnis ein Vorhang vor dem
+                        // Board — es geht zu, sobald man ein Ziel gewaehlt hat.
+                        if (isTouch) setIndexOpen(false)
+                        glideTo(f.x, f.y, f.w, f.h, { ignoreIndex: isTouch })
+                        setSel({ kind: 'frame', id: f.id })
+                      }}
+                      onMouseEnter={() => setHotFrame(f.id)}
+                      onMouseLeave={() => setHotFrame(null)}
+                    >
+                      <i className="board-index-dot" style={{ background: `var(--n-${f.color})` }} />
+                      <span className="board-index-name">{f.label}</span>
+                      <span className="mono">{inside.length}</span>
+                    </button>
+                  )
+                })}
+
+                {frames.length === 0 && (
+                  <div className="board-index-empty">
+                    Noch keine Bereiche. Unten auf <b>Bereich</b> tippen und einen Rahmen um
+                    zusammengehörige Einträge ziehen.
+                  </div>
+                )}
+
+                {looseNodes.length > 0 && (
+                  <button
+                    className="board-index-row board-index-row--loose"
+                    onClick={() => {
+                      const x0 = Math.min(...looseNodes.map((n) => n.x))
+                      const y0 = Math.min(...looseNodes.map((n) => n.y))
+                      const x1 = Math.max(...looseNodes.map((n) => n.x + n.w))
+                      const y1 = Math.max(...looseNodes.map((n) => n.y + (sizes[n.id]?.h ?? 48)))
+                      if (isTouch) setIndexOpen(false)
+                      glideTo(x0, y0, x1 - x0, y1 - y0, { ignoreIndex: isTouch })
+                    }}
+                  >
+                    <i className="board-index-dot board-index-dot--none" />
+                    <span className="board-index-name">Ohne Bereich</span>
+                    <span className="mono">{looseNodes.length}</span>
+                  </button>
+                )}
+
+                <button
+                  className="board-index-row board-index-row--all"
+                  onClick={() => {
+                    if (isTouch) setIndexOpen(false)
+                    const e = everything()
+                    if (e) glideTo(e.x, e.y, e.w, e.h, { ignoreIndex: isTouch })
+                  }}
+                >
+                  Alles zeigen
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className={'board-index board-switch' + (boardsOpen ? '' : ' board-index--shut')}>
+            <button className="board-index-head" onClick={() => setBoardsOpen((o) => !o)}>
+              <span>Boards</span>
+              <span className="mono">{state.meta.boards.length}</span>
+              <ChevR className={'board-index-caret' + (boardsOpen ? ' board-index-caret--open' : '')} />
+            </button>
+
+            {boardsOpen ? (
+              <div className="board-index-list">
+                {state.meta.boards.map((bd) => {
+                  const count = state.nodes.filter((n) => n.board === bd.id).length
+                  const active = bd.id === board
+                  return (
+                    <div key={bd.id} className={'board-row' + (active ? ' board-row--on' : '')}>
+                      {renaming === bd.id ? (
+                        <input
+                          className="board-rename"
+                          defaultValue={bd.name}
+                          autoFocus
+                          // Beim Anlegen steht "Board 2" drin — tippen soll
+                          // das ersetzen, nicht daran haengen.
+                          onFocus={(e) => e.target.select()}
+                          {...noAutofill}
+                          onBlur={(e) => { renameBoard(bd.id, e.target.value); setRenaming(null) }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            if (e.key === 'Escape') setRenaming(null)
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <button className="board-row-name" onClick={() => switchBoard(bd.id)}>
+                            {bd.name}
+                          </button>
+                          <span className="mono">{count}</span>
+                          <button className="board-row-act" onClick={() => setRenaming(bd.id)} aria-label="Umbenennen" title="Umbenennen">
+                            <Pencil />
+                          </button>
+                          {state.meta.boards.length > 1 && (
+                            <button
+                              className="board-row-act board-row-act--drop"
+                              onClick={() => removeBoard(bd.id)}
+                              aria-label="Board löschen" title="Board mitsamt Inhalt löschen"
+                            >
+                              <Trash />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+                <button className="board-index-row board-index-row--all" onClick={addBoard}>
+                  <Plus /> Neues Board
+                </button>
+              </div>
+            ) : (
+              <div className="board-switch-current">{state.meta.boards.find((bd) => bd.id === board)?.name}</div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="board-toolbar">
+      <div className="board-toolbar" ref={toolbarRef}>
         <button className="btn btn--quiet btn--sm" onClick={() => {
           const r = wrapRef.current!.getBoundingClientRect()
           const c = toWorld(r.left + r.width / 2, r.top + r.height / 2)

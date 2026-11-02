@@ -1,12 +1,16 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { SUPABASE_KEY, SUPABASE_URL } from '../data/otaat-source'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-
-/** Ohne Env-Variablen laeuft OTAAT komplett lokal weiter. */
+/**
+ * Ohne gueltige Adresse laeuft OTAAT komplett lokal weiter — der Stand liegt
+ * dann nur im localStorage. Die Vorgabe steht in `otaat-source.ts`, eine
+ * `.env` sticht sie aus.
+ */
 export const supabase: SupabaseClient | null =
-  url && key && url.startsWith('http')
-    ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true } })
+  SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http')
+    ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      })
     : null
 
 export const cloudEnabled = supabase !== null

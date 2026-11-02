@@ -91,7 +91,7 @@ egal wie oft gebaut wird.
 
 | Einstellung | Wert |
 |---|---|
-| Branch | `claude/habit-structure-app-1szmgx` |
+| Branch | `main` |
 | Deploy command | `npx wrangler deploy` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
@@ -99,14 +99,44 @@ Die Node-Version steht in `.nvmrc`. Die Env-Variablen muessen zur **Build**-Zeit
 gesetzt sein, nicht zur Laufzeit: Vite backt sie in das Bundle. Nachtraeglich
 gesetzte Variablen wirken erst nach einem neuen Build.
 
-Die Navigation laeuft ueber Hash-Routing (`#/today`), es braucht also keine
-Rewrite-Regeln. `public/_redirects` und `public/_headers` liegen trotzdem dabei
-— Workers Assets liest beide — falls spaeter auf History-Routing umgestellt wird.
+Die Navigation laeuft ueber Hash-Routing (`#/today`), Rewrite-Regeln braucht es
+also nicht. Falls spaeter auf History-Routing umgestellt wird, uebernimmt
+`not_found_handling: "single-page-application"` in `wrangler.jsonc` den
+Fallback.
+
+**Keine `_redirects` mit `/* /index.html 200` anlegen.** Das ist der uebliche
+SPA-Catch-all bei Cloudflare Pages, aber Workers Assets weist ihn ab: Workers
+entfernt `.html` und `/index` von sich aus, dadurch faellt `/index.html` auf
+`/` zurueck, matcht die Regel erneut und die API antwortet mit
+`Infinite loop detected in this rule`. `public/_headers` ist unproblematisch
+und bleibt.
 
 > Der `anon`-Key gehoert ins Frontend, das ist so vorgesehen. Was ihn absichert,
 > ist RLS — nicht Geheimhaltung. Der **Service-Role-Key** dagegen darf niemals
 > in den Build; er wird ausschliesslich in der Edge Function verwendet, wo
 > Supabase ihn automatisch injiziert.
+
+## Essen kommt von woanders
+
+Die Rubrik **Essen** im Everything Checker wird nicht von Hand gepflegt: sie
+liest die Kalorien des Tages aus dem Kalorienbrudi-Bestand, der im selben
+Supabase-Projekt liegt. Die Werte landen wie jeder andere Check im Tagesbestand,
+zaehlen also in Serien, Statistik und Zusammenhaenge mit hinein.
+
+Gelesen wird ausschliesslich die View `brudi_tag_public` aus
+[`supabase/migrations/0002`](supabase/migrations/0002_brudi_tag_public.sql):
+Datum, Kalorien, Tagesziel. **Kein** Gewicht, keine Symptome, keine
+Lebensmittelliste, nichts aus dem Kosmetikstudio. Die drei Basistabellen
+bleiben fuer den oeffentlichen Schluessel gesperrt -- RLS ist dort an, und es
+gibt keine Policy.
+
+Diese drei Spalten sind damit bewusst oeffentlich lesbar: der Schluessel steht
+im ausgelieferten Bundle. Das war die Abwaegung gegen eine Anmeldung -- soll es
+doch hinter einen Login, braucht `tagesuebersicht` eine Policy fuer
+`authenticated` und die View faellt weg.
+
+Quelle und Schluessel stehen in `src/data/brudi-source.ts` und lassen sich ueber
+`VITE_BRUDI_URL` / `VITE_BRUDI_KEY` ueberschreiben.
 
 ## Kalender (Apple)
 

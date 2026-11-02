@@ -4,7 +4,7 @@ export type ID = string
 
 /* ---------- Everything Checker ---------- */
 
-export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'text'
+export type CheckKind = 'bool' | 'scale' | 'number' | 'choice' | 'multi' | 'text' | 'external'
 
 export interface CheckDef {
   id: ID
@@ -12,28 +12,80 @@ export interface CheckDef {
   kind: CheckKind
   /** kurzer Einheiten-Hinweis, z.B. "h", "Tassen" — bewusst nur wo noetig */
   unit?: string
-  /** fuer kind === 'choice' */
+  /** fuer kind === 'choice' und 'multi' */
   options?: string[]
+  /** Option, die alle anderen ausschliesst — z.B. "Nix" bei Sport */
+  noneOption?: string
+  /** Startwert fuer einen frischen Tag, wenn es noch keinen Vortag gibt */
+  fallback?: CheckValue
+  /** Woher die Werte kommen, wenn kind === 'external'. Nicht editierbar. */
+  source?: 'brudi' | 'oura'
   /** Schrittweite fuer kind === 'number' */
   step?: number
   /** Ab diesem Wert zaehlt der Tag als "erfuellt" (number/scale). Bei bool: true. */
   target?: number
   /** Niedriger ist besser (z.B. Social Media, Alkohol) */
   inverse?: boolean
+  /**
+   * Eine Zahl in Stunden, die als Dauer gelesen wird: 7 h 43 min statt 7,7.
+   *
+   * Gespeichert bleiben Stunden als Kommazahl — daran haengen Zielwert,
+   * Verlauf und die ganze Statistik, und eine zweite Einheit im Bestand
+   * waere ein Wechselkurs, den irgendwann jemand vergisst. Es ist eine
+   * Frage der Darstellung, nicht der Ablage.
+   */
+  asDuration?: boolean
+  /**
+   * Faengt jeden Tag leer an, statt den Wert vom Vortag zu uebernehmen.
+   *
+   * Fuer alles, was gemessen wird und nicht geschaetzt: beim Schlaf stuende
+   * sonst morgens die Zahl von gestern da, bis der Ring sie ersetzt — und
+   * bis dahin weiss man nicht, ob das der eigene Schlaf war oder ein Rest
+   * von vorgestern.
+   */
+  noCarry?: boolean
+  /**
+   * Zusaetzlich zur Zahl eine Uhrzeit. Sie liegt unter einem eigenen
+   * Schluessel im selben Tag (`timeKey`), nicht im Wert des Checks — ein
+   * Check hat einen Wert, und aus 7,5 Stunden und 23:15 waere sonst ein
+   * Gebilde geworden, mit dem Statistik und Abgleich nichts anfangen.
+   */
+  withTime?: boolean
   /** Board-Nodes, auf die dieser Check einzahlt */
   goals?: ID[]
   archived?: boolean
   sort: number
 }
 
-export type CheckValue = boolean | number | string | null
+export type CheckValue = boolean | number | string | string[] | null
 
 export interface DayEntry {
   date: string            // YYYY-MM-DD
   values: Record<ID, CheckValue>
   note?: string
-  /** Checks, fuer die an diesem Tag schon XP vergeben wurde — verhindert Farmen durch An/Aus. */
-  awarded?: ID[]
+  /**
+   * Erst ein bestaetigter Tag zaehlt. Vorher stehen die Werte zwar im Feld
+   * — uebernommen vom letzten Mal —, sind aber nur ein Vorschlag und gehen
+   * nicht in Serie, Statistik oder Zusammenhaenge ein.
+   */
+  confirmed?: boolean
+  /**
+   * Checks, die ihre Uebernahme vom Vortag an diesem Tag schon bekommen
+   * haben. Ohne das Gedaechtnis waere ein geloeschter Wert im naechsten
+   * Wimpernschlag wieder da — die Uebernahme kann nicht unterscheiden, ob
+   * ein Feld noch nie gefuellt war oder gerade absichtlich geleert wurde.
+   * Eine erst heute angelegte Rubrik steht noch nicht drin und holt sich
+   * ihre Uebernahme deshalb nach.
+   */
+  carried?: ID[]
+  /**
+   * Gemessene Werte, die man fuer diesen Tag weggeworfen hat.
+   *
+   * Der Ring meldet auch Tage, an denen er nur nachts am Finger war — acht
+   * Schritte, und der Schnitt ist hin. Ohne diesen Vermerk waere das Loeschen
+   * sinnlos: der naechste Abruf traegt den Wert wieder ein.
+   */
+  dropped?: ID[]
 }
 
 /* ---------- Future Me Problems ---------- */
@@ -63,8 +115,17 @@ export interface Reminder {
 
 export type NodeColor = 'slate' | 'cobalt' | 'signal' | 'moss' | 'plum' | 'amber'
 
+/** Ein Board ist eine eigene Flaeche. Knoten, Bereiche und Linien gehoeren
+    immer zu genau einem. */
+export interface Board {
+  id: ID
+  name: string
+  createdAt: string
+}
+
 export interface BoardNode {
   id: ID
+  board: ID
   x: number
   y: number
   w: number
@@ -76,6 +137,7 @@ export interface BoardNode {
 
 export interface BoardFrame {
   id: ID
+  board: ID
   x: number
   y: number
   w: number
@@ -86,6 +148,7 @@ export interface BoardFrame {
 
 export interface BoardEdge {
   id: ID
+  board: ID
   from: ID
   to: ID
 }
@@ -102,5 +165,31 @@ export interface AppState {
   nodes: BoardNode[]
   frames: BoardFrame[]
   edges: BoardEdge[]
-  meta: { xp: number; theme: Theme; dismissedPresets: string[] }
+  meta: {
+    theme: Theme
+    dismissedPresets: string[]
+    v?: number
+    /** Die Boards liegen in meta, nicht in einer eigenen Tabelle: es sind
+        wenige, winzige Eintraege, und meta wird ohnehin mitsynchronisiert. */
+    boards: Board[]
+    activeBoard: ID
+    /**
+     * Wer man im Kalorienbrudi-Bestand ist. Dort liegen zwei Konten; ohne
+     * die Angabe weiss die Essens-Rubrik nicht, wessen Zahlen sie holen soll.
+     *
+     * Steht in `meta` und nicht im Konto, weil es die App betrifft und nicht
+     * die Anmeldung: es entscheidet, welche Werte in die Tage geschrieben
+     * werden. Und es soll auf allen Geraeten dasselbe sein.
+     */
+    brudiPerson?: string
+    /**
+     * Rubriken, die man ausdruecklich rausgeworfen hat.
+     *
+     * Braucht es, seit eine verbundene Quelle ihre Rubriken selbst nachtraegt:
+     * ohne den Vermerk kaeme die Schritte-Karte nach jedem Loeschen beim
+     * naechsten Start zurueck — genau der Fehler, der die Sport-Optionen
+     * schon einmal gekostet hat.
+     */
+    droppedChecks?: ID[]
+  }
 }
