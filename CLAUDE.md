@@ -2,15 +2,26 @@
 
 ## Branches
 
-**Arbeitsbranch ist `claude/habit-structure-app-1szmgx`.** Dort wird
-entwickelt, committet und gepusht — das ist der Branch, den Cloudflare baut.
+**Beide Branches bekommen denselben Stand.** Entwickelt wird auf
+`claude/habit-structure-app-1szmgx`; wenn die Arbeit steht, geht derselbe
+Commit per Fast-Forward auch auf `main`:
 
-`main` trug die Arbeit bis zum 2.11.2026 und ist bis dahin die Historie. Der
-Arbeitsbranch war ein eigener Strang vom ersten Projekttag und hing 50 Commits
-hinterher; beide Stränge sind jetzt zusammengeführt (`-s ours` plus
-`read-tree`, damit keine Historie verloren geht, der Baum aber ganz von `main`
-kommt). **Nicht mehr auf `main` pushen**, auch wenn GitHub ihn als
-Default-Branch anzeigt.
+```bash
+git push -u origin claude/habit-structure-app-1szmgx
+git push origin claude/habit-structure-app-1szmgx:main
+```
+
+**Cloudflare baut `main`.** Das war eine Weile anders dokumentiert, und die
+Folge war ein Dashboard, das fertig im Repo lag und auf dem Handy nicht
+auftauchte. Belegt ist es an der Formulierung „gab es … meist auch" in
+`InsightRow.tsx`: die kam mit `d5da306` **nur auf `main`** und stand auf dem
+Telefon. Wer es neu prüfen will, nimmt denselben Weg — eine Zeile suchen, die
+es nur auf einem Branch gibt, und nachsehen, ob sie live steht.
+
+Der Arbeitsbranch war bis zum 2.11.2026 ein eigener Strang vom ersten
+Projekttag und hing 50 Commits hinterher; beide Stränge sind zusammengeführt
+(`-s ours` plus `read-tree`, damit keine Historie verloren geht, der Baum aber
+ganz von `main` kommt). Seitdem zeigen beide auf denselben Commit.
 
 Keine Feature-Branches, keine Pull Requests, solange nicht ausdrücklich danach
 gefragt wird.
