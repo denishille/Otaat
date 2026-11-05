@@ -238,3 +238,83 @@ export function niceTicks(min: number, max: number, wunsch = 4): { ticks: number
   }
   return { ticks, lo, hi }
 }
+
+/* ------------------------------------------------------------------ */
+/* Auspraegung: was die Haupt-KPI bei welchem Nebenwert macht           */
+/* ------------------------------------------------------------------ */
+
+/** So viele Tage muss eine Stufe tragen, sonst steht sie nicht da. */
+const MIN_STUFE = 3
+
+export interface Stufe {
+  label: string
+  n: number
+  /** Schnitt der Haupt-KPI an diesen Tagen. */
+  schnitt: number
+}
+
+/**
+ * Die Haupt-KPI, aufgeteilt nach den Werten einer Nebengroesse.
+ *
+ * "Energie an Tagen unter Menschen gegen Energie allein", und bei einer Zahl
+ * statt eines Hakens dasselbe in Stufen: Energie bei sechs, sieben, acht
+ * Stunden Schlaf. Der Graph zeigt den Verlauf, aber nicht, ob sich das
+ * ueberhaupt in einer Zahl niederschlaegt — das steht hier.
+ *
+ * Gezaehlt werden nur Tage, an denen **beide** einen Wert haben, und eine
+ * Stufe muss mindestens drei davon tragen. Zwei Tage sind kein Durchschnitt,
+ * sondern zwei Tage — und standen als Zeile genauso breit da wie eine aus
+ * neunzehn.
+ *
+ * Das ist eine Aufteilung, keine Ursache: wer wenig schlaeft, hat oft auch
+ * den Abend davor anders verbracht.
+ */
+export function auspraegung(haupt: Reihe, neben: Reihe): Stufe[] {
+  const paare: { x: number; y: number }[] = []
+  neben.werte.forEach((x, i) => {
+    const y = haupt.werte[i]
+    if (x === null || y === null) return
+    paare.push({ x, y })
+  })
+  if (paare.length < 4) return []
+
+  const koerbe = new Map<number, { summe: number; n: number }>()
+  const flagge = neben.param.art === 'anteil'
+  // Bei Zahlen: Stufen auf runden Schritten, etwa fuenf Stueck. Bei Haken
+  // gibt es nur ja und nein.
+  const schritt = flagge ? 1 : stufenSchritt(neben.min, neben.max)
+  for (const p of paare) {
+    const k = flagge ? (p.x >= 0.5 ? 1 : 0) : Math.round(p.x / schritt) * schritt
+    const e = koerbe.get(k) ?? { summe: 0, n: 0 }
+    e.summe += p.y
+    e.n++
+    koerbe.set(k, e)
+  }
+
+  return [...koerbe.entries()]
+    .filter(([, e]) => e.n >= MIN_STUFE)
+    .sort((a, b) => a[0] - b[0])
+    .map(([k, e]) => ({
+      label: flagge ? (k ? 'ja' : 'nein') : zeigeWert(neben.param, k),
+      n: e.n,
+      schnitt: e.summe / e.n,
+    }))
+}
+
+/** Eine runde Stufenbreite, die die Spanne in etwa fuenf Teile legt. */
+function stufenSchritt(min: number, max: number): number {
+  const roh = (max - min) / 5
+  if (!(roh > 0)) return 1
+  const pot = Math.pow(10, Math.floor(Math.log10(roh)))
+  return [1, 2, 2.5, 5, 10].map((f) => f * pot).find((s) => s >= roh) ?? 10 * pot
+}
+
+/**
+ * Ein Durchschnitt, lesbar gemacht.
+ *
+ * Bei einem Haken ist der Schnitt ein Anteil — "ja" waere dafuer das falsche
+ * Wort, 0,4 heisst an zwei von fuenf Tagen.
+ */
+export function zeigeSchnitt(p: Param, v: number): string {
+  return p.art === 'anteil' ? `${Math.round(v * 100)} %` : zeigeWert(p, v)
+}

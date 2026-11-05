@@ -1541,3 +1541,28 @@ h2.section-title {
   font-family: var(--mono); font-size: 12px; color: var(--ink-3); white-space: nowrap;
 }
 .dash-voll-graph { flex: 1; min-height: 0; }
+
+/* Ausschnitt und Zoom */
+.dash-tag { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dash-tag > span { flex: 1; min-width: 0; }
+.dash-tag .btn { flex: none; }
+
+/* Ausprägung: was die Haupt-KPI bei welchem Nebenwert macht */
+.dash-stufen { margin-top: 28px; }
+.dash-stufe { margin-top: 16px; }
+.dash-tab { width: 100%; border-collapse: collapse; }
+.dash-tab th {
+  text-align: left; font-weight: 500; font-size: 13px; color: var(--ink-2);
+  font-family: var(--mono); white-space: nowrap; padding: 4px 10px 4px 0; width: 1%;
+}
+.dash-tab-balken { width: auto; padding: 4px 0; }
+.dash-tab-balken > i { display: block; height: 8px; border-radius: 4px; }
+.dash-tab-wert {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink);
+  text-align: right; white-space: nowrap; padding: 4px 0 4px 10px; width: 1%;
+}
+.dash-tab-n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
+  text-align: right; white-space: nowrap; padding: 4px 0 4px 8px; width: 1%;
+}
+.dash-tag-sicht { flex: none; color: var(--ink-4); font-size: 11.5px; }
