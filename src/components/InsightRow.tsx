@@ -11,12 +11,23 @@ export const insightKey = (i: Insight) =>
  * Ja/Nein-Rubriken brauchen eigene Worte. "War Kreatin hoch" ergibt keinen
  * Satz: an einem Haken gibt es keine Hoehe, nur ob er dran war. Dasselbe auf
  * der anderen Seite — "war Sauna meist hoch" statt "gab es Sauna meist auch".
+ *
+ * **Am selben Tag steht kein Pfeil im Satz.** Eine Korrelation ohne Versatz
+ * ist symmetrisch; welche der beiden Groessen vorn stand, entschied allein
+ * die Reihenfolge der Merkmalsliste. Daraus wurde "War Alkohol hoch, gab es
+ * Unter Menschen meist auch" — gelesen als Ursache, und zwar als die
+ * verkehrte. Erst ein Versatz gibt eine Richtung vor, weil die Zeit eine hat.
  */
 export function InsightRow({ i }: { i: Insight }) {
   return (
     <div className={'insight' + (i.solid ? '' : ' insight--weak')}>
       <div className="insight-text">
-        {ursache(i.a, i.shift)} {wirkung(i.b, i.shift, i.r)}.
+        {i.shift.kind === 'same'
+          ? <>
+              <b>{i.a.name}</b> und <b>{i.b.name}</b> laufen am selben Tag{' '}
+              <b>{i.r > 0 ? 'zusammen' : 'gegeneinander'}</b>.
+            </>
+          : <>{ursache(i.a, i.shift)} {wirkung(i.b, i.shift, i.r)}.</>}
       </div>
       <div className="insight-meta">
         <span>{strengthLabel(i.r)}</span>

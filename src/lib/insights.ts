@@ -468,6 +468,50 @@ export const isFlag = (f: Feature): boolean =>
   f.check.kind === 'bool' || f.check.kind === 'multi'
 
 /**
+ * Was eine Rubrik ueberhaupt ist.
+ *
+ *   `tat`       — etwas, das man tut: Sauna, Kreatin, Alkohol, Arbeit
+ *   `befinden`  — wie es einem ging: Fokus, Stress, Energie
+ *   `messung`   — was ein Geraet oder eine Quelle liefert: Schlaf, HRV, Essen
+ *
+ * Abgeleitet statt gespeichert: `noCarry` traegt nur, was gemessen wird —
+ * daran haengt die einzige Zahl, die sonst mehrdeutig waere (Schlaf ist eine
+ * Zahl wie Kaffee, aber keine Tat). Keine neue Angabe im Bestand, keine
+ * Migration, und eine neu angelegte Rubrik landet von selbst richtig.
+ */
+export type Rolle = 'tat' | 'befinden' | 'messung'
+
+export function rolle(def: CheckDef): Rolle {
+  if (def.kind === 'external' || def.source || def.noCarry) return 'messung'
+  if (def.kind === 'scale') return 'befinden'
+  return 'tat'
+}
+
+/**
+ * Am selben Tag hat ein Zusammenhang **keine Richtung** — und zwischen zwei
+ * Dingen derselben Art meist auch keinen Inhalt.
+ *
+ * Zwei Taten am selben Tag sind die Routine: Kreatin und Im8 liegen
+ * nebeneinander, Alkohol gibt es, wenn man unter Menschen ist. Das beschreibt
+ * den Tagesablauf, den man selbst am besten kennt, und nicht seine Wirkung.
+ *
+ * Zwei Selbsteinschaetzungen am selben Tag sind ein Gefuehl mit zwei Namen.
+ * Fokus und Energie werden abends in derselben Minute vergeben; dass sie
+ * miteinander laufen, sagt etwas ueber das Ausfuellen und nichts ueber den Tag.
+ *
+ * **Versetzt bleibt beides erlaubt**: "nach der Sauna am naechsten Tag Sport"
+ * und "Stress heute, Fokus in drei Tagen" sind echte Fragen, und dort gibt es
+ * eine Richtung, weil die Zeit eine vorgibt.
+ *
+ * Gemessenes gegen Gemessenes regelt `selbeMessung()` — Essen gegen Schritte
+ * soll vergleichbar bleiben.
+ */
+function selbeArt(a: Feature, b: Feature): boolean {
+  const ra = rolle(a.check)
+  return ra !== 'messung' && ra === rolle(b.check)
+}
+
+/**
  * Ein paar Tausend Tests kosten auf dem Handy ein Viertel einer Sekunde. Der
  * Checker und das Detail einer Rubrik fragen beide, und der State wird bei
  * jedem Tastendruck neu geklont — deshalb ein Gedaechtnis. Der Schluessel ist
@@ -539,6 +583,8 @@ function search(feats: Feature[], span: number): Insight[] {
       if (a.check.id === b.check.id) continue
       if (a.hidden && b.hidden) continue
       if (selbeMessung(a, b)) continue
+      // Am selben Tag: zwei Taten sind Routine, zwei Skalen ein Gefuehl.
+      if (selbeArt(a, b)) continue
       const xs: number[] = []
       const ys: number[] = []
       for (let k = 0; k < span; k++) {
